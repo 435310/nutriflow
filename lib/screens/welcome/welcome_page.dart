@@ -4,6 +4,7 @@ import '../../app/routes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/theme/colors.dart';
 import '../../core/theme/text_styles.dart';
+import '../test/avatar_test_page.dart';
 
 /// ============================================
 /// TELA: BOAS-VINDAS (com animações)
@@ -340,6 +341,20 @@ class _WelcomePageState extends State<WelcomePage>
                 ),
 
                 const SizedBox(height: 32),
+
+                // ⚠️ BOTÃO TEMPORÁRIO PARA TESTE — REMOVER DEPOIS
+const SizedBox(height: 16),
+TextButton(
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AvatarTestPage(),
+      ),
+    );
+  },
+  child: const Text('🧪 Testar Avatar (temporário)'),
+),
               ],
             ),
           ),
