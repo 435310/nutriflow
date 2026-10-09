@@ -318,13 +318,8 @@ class _ProfilePageState extends State<ProfilePage>
                   position: _buttonSlide,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Editar perfil em breve'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
+  AppRoutes.go(context, AppRoutes.editProfile);
+},
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Editar perfil'),
                   ),
