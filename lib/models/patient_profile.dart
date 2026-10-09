@@ -2,7 +2,6 @@
 /// MODELO: PERFIL DO PACIENTE
 /// ============================================
 /// Representa os dados de um paciente no NutriFlow.
-/// Este modelo é usado em todas as telas (perfil, dashboard, etc).
 class PatientProfile {
   // ============================================
   // IDENTIFICAÇÃO
@@ -21,18 +20,20 @@ class PatientProfile {
   // ============================================
   // DADOS CLÍNICOS
   // ============================================
-  final double? heightCm;       // Altura em centímetros
-  final double? currentWeightKg; // Peso atual em kg
-  final double? initialWeightKg; // Peso inicial (primeira consulta)
-  final double? goalWeightKg;    // Meta de peso
-  final Goal? goal;              // Objetivo
+  final double? heightCm;        // Altura em centímetros
+  final double? initialWeightKg;  // Peso inicial (primeira consulta)
+  final double? currentWeightKg;  // Peso atual
+  final double? goalWeightKg;     // Meta de peso
+  final double? waistCm;          // Circunferência abdominal
+  final Goal? goal;               // Objetivo
+  final ActivityLevel? activityLevel; // Nível de atividade física
 
   // ============================================
   // RESTRIÇÕES E PREFERÊNCIAS
   // ============================================
-  final List<String> foodRestrictions; // Ex: ["Lactose", "Glúten"]
-  final List<String> allergies;        // Ex: ["Amendoim", "Frutos do mar"]
-  final String? notes;                 // Observações gerais
+  final List<String> foodRestrictions;
+  final List<String> allergies;
+  final String? notes;
 
   // ============================================
   // METADADOS
@@ -48,10 +49,12 @@ class PatientProfile {
     this.birthDate,
     this.gender,
     this.heightCm,
-    this.currentWeightKg,
     this.initialWeightKg,
+    this.currentWeightKg,
     this.goalWeightKg,
+    this.waistCm,
     this.goal,
+    this.activityLevel,
     this.foodRestrictions = const [],
     this.allergies = const [],
     this.notes,
@@ -63,7 +66,7 @@ class PatientProfile {
   // GETTERS ÚTEIS
   // ============================================
 
-  /// Calcula o IMC (Índice de Massa Corporal)
+  /// IMC (Índice de Massa Corporal)
   double? get bmi {
     if (heightCm == null || currentWeightKg == null) return null;
     if (heightCm! <= 0) return null;
@@ -107,8 +110,60 @@ class PatientProfile {
     return years;
   }
 
+  /// Risco cardiovascular baseado na circunferência abdominal
+  /// (referência: OMS)
+  String? get waistRisk {
+    if (waistCm == null || gender == null) return null;
+
+    if (gender == Gender.female) {
+      if (waistCm! < 80) return 'Normal';
+      if (waistCm! < 88) return 'Atenção';
+      return 'Risco elevado';
+    } else {
+      if (waistCm! < 94) return 'Normal';
+      if (waistCm! < 102) return 'Atenção';
+      return 'Risco elevado';
+    }
+  }
+
+  /// Relação cintura/altura (RCA) — indicador mais preciso que IMC
+  double? get waistToHeightRatio {
+    if (waistCm == null || heightCm == null || heightCm! <= 0) return null;
+    return waistCm! / heightCm!;
+  }
+
+  /// Taxa Metabólica Basal (TMB) — fórmula de Mifflin-St Jeor
+  /// Retorna kcal/dia
+  double? get basalMetabolicRate {
+    if (currentWeightKg == null ||
+        heightCm == null ||
+        age == null ||
+        gender == null) {
+      return null;
+    }
+
+    if (gender == Gender.male) {
+      return (10 * currentWeightKg!) +
+          (6.25 * heightCm!) -
+          (5 * age!) +
+          5;
+    } else {
+      return (10 * currentWeightKg!) +
+          (6.25 * heightCm!) -
+          (5 * age!) -
+          161;
+    }
+  }
+
+  /// Gasto calórico total estimado (TMB × fator de atividade)
+  double? get totalDailyEnergyExpenditure {
+    final tmb = basalMetabolicRate;
+    if (tmb == null || activityLevel == null) return null;
+    return tmb * activityLevel!.factor;
+  }
+
   // ============================================
-  // CÓPIA COM ALTERAÇÕES (copyWith)
+  // COPYWITH
   // ============================================
   PatientProfile copyWith({
     String? id,
@@ -118,10 +173,12 @@ class PatientProfile {
     DateTime? birthDate,
     Gender? gender,
     double? heightCm,
-    double? currentWeightKg,
     double? initialWeightKg,
+    double? currentWeightKg,
     double? goalWeightKg,
+    double? waistCm,
     Goal? goal,
+    ActivityLevel? activityLevel,
     List<String>? foodRestrictions,
     List<String>? allergies,
     String? notes,
@@ -136,10 +193,12 @@ class PatientProfile {
       birthDate: birthDate ?? this.birthDate,
       gender: gender ?? this.gender,
       heightCm: heightCm ?? this.heightCm,
-      currentWeightKg: currentWeightKg ?? this.currentWeightKg,
       initialWeightKg: initialWeightKg ?? this.initialWeightKg,
+      currentWeightKg: currentWeightKg ?? this.currentWeightKg,
       goalWeightKg: goalWeightKg ?? this.goalWeightKg,
+      waistCm: waistCm ?? this.waistCm,
       goal: goal ?? this.goal,
+      activityLevel: activityLevel ?? this.activityLevel,
       foodRestrictions: foodRestrictions ?? this.foodRestrictions,
       allergies: allergies ?? this.allergies,
       notes: notes ?? this.notes,
@@ -149,7 +208,7 @@ class PatientProfile {
   }
 
   // ============================================
-  // DADOS DE EXEMPLO (para desenvolvimento)
+  // MOCK (dados de exemplo)
   // ============================================
   static PatientProfile mock() {
     return PatientProfile(
@@ -160,10 +219,12 @@ class PatientProfile {
       birthDate: DateTime(1990, 5, 15),
       gender: Gender.female,
       heightCm: 165,
-      currentWeightKg: 72.4,
       initialWeightKg: 78.0,
+      currentWeightKg: 72.4,
       goalWeightKg: 65.0,
+      waistCm: 88,
       goal: Goal.lose,
+      activityLevel: ActivityLevel.moderate,
       foodRestrictions: ['Lactose'],
       allergies: ['Amendoim'],
       notes: 'Pratica atividade física 3x por semana.',
@@ -197,9 +258,9 @@ extension GenderExtension on Gender {
 }
 
 enum Goal {
-  lose,    // Emagrecer
-  maintain, // Manter peso
-  gain,    // Ganhar massa
+  lose,
+  maintain,
+  gain,
 }
 
 extension GoalExtension on Goal {
@@ -222,6 +283,62 @@ extension GoalExtension on Goal {
         return '⚖️';
       case Goal.gain:
         return '💪';
+    }
+  }
+}
+
+enum ActivityLevel {
+  sedentary,
+  light,
+  moderate,
+  intense,
+  athlete,
+}
+
+extension ActivityLevelExtension on ActivityLevel {
+  String get label {
+    switch (this) {
+      case ActivityLevel.sedentary:
+        return 'Sedentário';
+      case ActivityLevel.light:
+        return 'Leve';
+      case ActivityLevel.moderate:
+        return 'Moderado';
+      case ActivityLevel.intense:
+        return 'Intenso';
+      case ActivityLevel.athlete:
+        return 'Atleta';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ActivityLevel.sedentary:
+        return 'Pouco ou nenhum exercício';
+      case ActivityLevel.light:
+        return '1-3x por semana';
+      case ActivityLevel.moderate:
+        return '3-5x por semana';
+      case ActivityLevel.intense:
+        return '6-7x por semana';
+      case ActivityLevel.athlete:
+        return '2x por dia';
+    }
+  }
+
+  /// Fator multiplicador para cálculo de gasto calórico
+  double get factor {
+    switch (this) {
+      case ActivityLevel.sedentary:
+        return 1.2;
+      case ActivityLevel.light:
+        return 1.375;
+      case ActivityLevel.moderate:
+        return 1.55;
+      case ActivityLevel.intense:
+        return 1.725;
+      case ActivityLevel.athlete:
+        return 1.9;
     }
   }
 }

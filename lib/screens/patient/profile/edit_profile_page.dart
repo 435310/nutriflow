@@ -26,11 +26,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
   final _goalWeightController = TextEditingController();
+  final _waistController = TextEditingController();
+  final _initialWeightController = TextEditingController();
 
   // Dados selecionados (dropdowns / date picker)
   DateTime? _birthDate;
   Gender? _gender;
   Goal? _goal;
+  ActivityLevel? _activityLevel;
 
   // Paciente atual (vem do mock por enquanto)
   final PatientProfile _profile = PatientProfile.mock();
@@ -45,11 +48,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _phoneController.text = _profile.phone ?? '';
     _heightController.text = _profile.heightCm?.toStringAsFixed(0) ?? '';
     _weightController.text = _profile.currentWeightKg?.toStringAsFixed(1) ?? '';
-    _goalWeightController.text = _profile.goalWeightKg?.toStringAsFixed(1) ?? '';
+    _goalWeightController.text =
+        _profile.goalWeightKg?.toStringAsFixed(1) ?? '';
+    _waistController.text = _profile.waistCm?.toStringAsFixed(0) ?? '';
+    _initialWeightController.text =
+        _profile.initialWeightKg?.toStringAsFixed(1) ?? '';
 
     _birthDate = _profile.birthDate;
     _gender = _profile.gender;
     _goal = _profile.goal;
+    _activityLevel = _profile.activityLevel;
   }
 
   @override
@@ -60,6 +68,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _heightController.dispose();
     _weightController.dispose();
     _goalWeightController.dispose();
+    _waistController.dispose();
+    _initialWeightController.dispose();
     super.dispose();
   }
 
@@ -88,7 +98,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   String? _validateHeight(String? value) {
-    if (value == null || value.isEmpty) return null; // opcional
+    if (value == null || value.isEmpty) return null;
     final parsed = double.tryParse(value.replaceAll(',', '.'));
     if (parsed == null) return 'Valor inválido';
     if (parsed < 50 || parsed > 250) return 'Altura entre 50 e 250 cm';
@@ -96,7 +106,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   String? _validateWeight(String? value) {
-    if (value == null || value.isEmpty) return null; // opcional
+    if (value == null || value.isEmpty) return null;
     final parsed = double.tryParse(value.replaceAll(',', '.'));
     if (parsed == null) return 'Valor inválido';
     if (parsed < 20 || parsed > 500) return 'Peso entre 20 e 500 kg';
@@ -118,15 +128,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
       birthDate: _birthDate,
       gender: _gender,
       heightCm: double.tryParse(_heightController.text.replaceAll(',', '.')),
+      initialWeightKg:
+          double.tryParse(_initialWeightController.text.replaceAll(',', '.')),
       currentWeightKg:
           double.tryParse(_weightController.text.replaceAll(',', '.')),
       goalWeightKg:
           double.tryParse(_goalWeightController.text.replaceAll(',', '.')),
+      waistCm: double.tryParse(_waistController.text.replaceAll(',', '.')),
       goal: _goal,
+      activityLevel: _activityLevel,
       updatedAt: DateTime.now(),
     );
 
-    // Por enquanto, só mostra SnackBar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Perfil atualizado: ${updated.name}'),
@@ -203,7 +216,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 20),
 
-                // Nome
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
@@ -217,7 +229,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // E-mail
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -231,7 +242,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Telefone
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -245,7 +255,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Data de nascimento (date picker)
+                // Data de nascimento
                 InkWell(
                   onTap: _pickBirthDate,
                   borderRadius: BorderRadius.circular(14),
@@ -264,7 +274,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Sexo (dropdown)
+                // Sexo
                 DropdownButtonFormField<Gender>(
                   value: _gender,
                   decoration: const InputDecoration(
@@ -312,6 +322,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
+                // Peso inicial
+                TextFormField(
+                  controller: _initialWeightController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  validator: _validateWeight,
+                  decoration: const InputDecoration(
+                    labelText: 'Peso inicial (kg)',
+                    hintText: 'Ex: 78.0',
+                    prefixIcon: Icon(Icons.history),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
                 // Peso atual
                 TextFormField(
                   controller: _weightController,
@@ -344,7 +370,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Objetivo (dropdown)
+                // Circunferência abdominal
+                TextFormField(
+                  controller: _waistController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Circunferência abdominal (cm)',
+                    hintText: 'Ex: 88',
+                    prefixIcon: Icon(Icons.straighten),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Objetivo
                 DropdownButtonFormField<Goal>(
                   value: _goal,
                   decoration: const InputDecoration(
@@ -360,6 +401,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   onChanged: (value) {
                     setState(() {
                       _goal = value;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // Nível de atividade física
+                DropdownButtonFormField<ActivityLevel>(
+                  value: _activityLevel,
+                  decoration: const InputDecoration(
+                    labelText: 'Nível de atividade física',
+                    prefixIcon: Icon(Icons.fitness_center),
+                  ),
+                  items: ActivityLevel.values.map((level) {
+                    return DropdownMenuItem<ActivityLevel>(
+                      value: level,
+                      child: Text('${level.label} — ${level.description}'),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _activityLevel = value;
                     });
                   },
                 ),

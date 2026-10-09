@@ -21,8 +21,6 @@ class _ProfilePageState extends State<ProfilePage>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
-  late Animation<double> _headerFade;
-  late Animation<Offset> _headerSlide;
   late Animation<double> _avatarFade;
   late Animation<double> _nameFade;
   late Animation<double> _emailFade;
@@ -35,7 +33,6 @@ class _ProfilePageState extends State<ProfilePage>
   late Animation<double> _buttonFade;
   late Animation<Offset> _buttonSlide;
 
-  // Paciente mock (dados fictícios por enquanto)
   final PatientProfile _profile = PatientProfile.mock();
 
   @override
@@ -47,50 +44,50 @@ class _ProfilePageState extends State<ProfilePage>
       duration: const Duration(milliseconds: 1400),
     );
 
-    _headerFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-      ),
-    );
-    _headerSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOutCubic),
-      ),
-    );
-
     _avatarFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.15, 0.45, curve: Curves.easeOut),
+        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
       ),
     );
 
     _nameFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.3, 0.55, curve: Curves.easeOut),
+        curve: const Interval(0.15, 0.4, curve: Curves.easeOut),
       ),
     );
 
     _emailFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.4, 0.65, curve: Curves.easeOut),
+        curve: const Interval(0.25, 0.5, curve: Curves.easeOut),
       ),
     );
 
     _card1Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.5, 0.75, curve: Curves.easeOut),
+        curve: const Interval(0.35, 0.6, curve: Curves.easeOut),
       ),
     );
     _card1Slide = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.35, 0.6, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    _card2Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.5, 0.75, curve: Curves.easeOut),
+      ),
+    );
+    _card2Slide = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
     ).animate(
@@ -100,26 +97,10 @@ class _ProfilePageState extends State<ProfilePage>
       ),
     );
 
-    _card2Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 0.85, curve: Curves.easeOut),
-      ),
-    );
-    _card2Slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 0.85, curve: Curves.easeOutCubic),
-      ),
-    );
-
     _card3Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.7, 0.9, curve: Curves.easeOut),
+        curve: const Interval(0.65, 0.85, curve: Curves.easeOut),
       ),
     );
     _card3Slide = Tween<Offset>(
@@ -128,14 +109,14 @@ class _ProfilePageState extends State<ProfilePage>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.7, 0.9, curve: Curves.easeOutCubic),
+        curve: const Interval(0.65, 0.85, curve: Curves.easeOutCubic),
       ),
     );
 
     _buttonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.85, 1.0, curve: Curves.easeOut),
+        curve: const Interval(0.8, 1.0, curve: Curves.easeOut),
       ),
     );
     _buttonSlide = Tween<Offset>(
@@ -144,7 +125,7 @@ class _ProfilePageState extends State<ProfilePage>
     ).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.85, 1.0, curve: Curves.easeOutCubic),
+        curve: const Interval(0.8, 1.0, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -253,11 +234,25 @@ class _ProfilePageState extends State<ProfilePage>
                             : 'Não informado',
                       ),
                       _InfoItem(
+                        label: 'Peso inicial',
+                        value: _profile.initialWeightKg != null
+                            ? '${_profile.initialWeightKg!.toStringAsFixed(1)} kg'
+                            : 'Não informado',
+                      ),
+                      _InfoItem(
                         label: 'Peso atual',
                         value: _profile.currentWeightKg != null
                             ? '${_profile.currentWeightKg!.toStringAsFixed(1)} kg'
                             : 'Não informado',
                       ),
+                      if (_profile.weightDelta != null &&
+                          _profile.weightDelta != 0)
+                        _InfoItem(
+                          label: 'Variação',
+                          value: _profile.weightDelta! < 0
+                              ? '▼ ${_profile.weightDelta!.abs().toStringAsFixed(1)} kg'
+                              : '▲ ${_profile.weightDelta!.toStringAsFixed(1)} kg',
+                        ),
                       _InfoItem(
                         label: 'Meta',
                         value: _profile.goalWeightKg != null
@@ -271,10 +266,21 @@ class _ProfilePageState extends State<ProfilePage>
                             : 'Não informado',
                       ),
                       _InfoItem(
+                        label: 'Cintura',
+                        value: _profile.waistCm != null
+                            ? '${_profile.waistCm!.toStringAsFixed(0)} cm'
+                                '${_profile.waistRisk != null ? ' (${_profile.waistRisk})' : ''}'
+                            : 'Não informado',
+                      ),
+                      _InfoItem(
                         label: 'Objetivo',
                         value: _profile.goal != null
                             ? '${_profile.goal!.icon} ${_profile.goal!.label}'
                             : 'Não informado',
+                      ),
+                      _InfoItem(
+                        label: 'Atividade',
+                        value: _profile.activityLevel?.label ?? 'Não informado',
                       ),
                     ],
                   ),
@@ -318,8 +324,8 @@ class _ProfilePageState extends State<ProfilePage>
                   position: _buttonSlide,
                   child: ElevatedButton.icon(
                     onPressed: () {
-  AppRoutes.go(context, AppRoutes.editProfile);
-},
+                      AppRoutes.go(context, AppRoutes.editProfile);
+                    },
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Editar perfil'),
                   ),
@@ -367,7 +373,6 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabeçalho do card
           Row(
             children: [
               Container(
@@ -383,10 +388,7 @@ class _InfoCard extends StatelessWidget {
               Text(title, style: AppTextStyles.h3),
             ],
           ),
-
           const SizedBox(height: 20),
-
-          // Itens
           ...items.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
                 child: Row(
