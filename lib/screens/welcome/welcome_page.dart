@@ -355,6 +355,14 @@ TextButton(
   },
   child: const Text('🧪 Testar Avatar (temporário)'),
 ),
+
+const SizedBox(height: 8),
+TextButton(
+  onPressed: () {
+    AppRoutes.go(context, AppRoutes.profile);
+  },
+  child: const Text('👤 Testar Perfil (temporário)'),
+),
               ],
             ),
           ),
