@@ -337,32 +337,36 @@ class _WelcomePageState extends State<WelcomePage>
 
                 const SizedBox(height: 24),
 
-                // ============================================
-                // BOTÕES TEMPORÁRIOS PARA TESTE
-                // ⚠️ REMOVER QUANDO O APP ESTIVER PRONTO
-                // ============================================
-
-                // Testar Avatar
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AvatarTestPage(),
-                      ),
-                    );
-                  },
-                  child: const Text('🧪 Testar Avatar (temporário)'),
-                ),
-
-                // Testar Perfil
-                TextButton(
-                  onPressed: () {
-                    AppRoutes.go(context, AppRoutes.profile);
-                  },
-                  child: const Text('👤 Testar Perfil (temporário)'),
-                ),
-
+                // ⚠️ BOTÕES TEMPORÁRIOS PARA TESTE — REMOVER DEPOIS
+TextButton(
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AvatarTestPage(),
+      ),
+    );
+  },
+  child: const Text('🧪 Testar Avatar (temporário)'),
+),
+TextButton(
+  onPressed: () {
+    AppRoutes.go(context, AppRoutes.profile);
+  },
+  child: const Text('👤 Testar Perfil (temporário)'),
+),
+TextButton(
+  onPressed: () {
+    AppRoutes.go(context, AppRoutes.patientDashboard);
+  },
+  child: const Text('🏠 Testar Dashboard Paciente (temporário)'),
+),
+TextButton(
+  onPressed: () {
+    AppRoutes.go(context, AppRoutes.nutritionistDashboard);
+  },
+  child: const Text('👨‍⚕️ Testar Dashboard Nutri (temporário)'),
+),
                 // Testar Dashboard
                 TextButton(
                   onPressed: () {
