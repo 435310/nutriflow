@@ -28,7 +28,6 @@ class _PatientsPageState extends State<PatientsPage>
   PatientFilter _selectedFilter = PatientFilter.all;
   PatientSort _selectedSort = PatientSort.lastActivity;
 
-  // ⚠️ Declaração sem valor inicial (preenchido no initState)
   late List<PatientSummary> _allPatients;
 
   @override
@@ -46,8 +45,6 @@ class _PatientsPageState extends State<PatientsPage>
 
     _controller.forward();
     _searchController.addListener(() => setState(() {}));
-
-    // ⚠️ Preenche a lista AQUI (não no campo)
     _allPatients = _buildMockPatients();
   }
 
@@ -155,9 +152,6 @@ class _PatientsPageState extends State<PatientsPage>
     };
   }
 
-  // ============================================
-  // PACIENTES FILTRADOS E ORDENADOS
-  // ============================================
   List<PatientSummary> get _filteredPatients {
     return filterAndSortPatients(
       patients: _allPatients,
@@ -167,9 +161,6 @@ class _PatientsPageState extends State<PatientsPage>
     );
   }
 
-  // ============================================
-  // MENU DE ORDENAÇÃO
-  // ============================================
   Future<void> _showSortMenu() async {
     final selected = await showModalBottomSheet<PatientSort>(
       context: context,
@@ -202,7 +193,9 @@ class _PatientsPageState extends State<PatientsPage>
           opacity: _fadeIn,
           child: Column(
             children: [
+              // ============================================
               // ÁREA FIXA (busca + filtros + ordenação)
+              // ============================================
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                 child: Column(
@@ -236,9 +229,7 @@ class _PatientsPageState extends State<PatientsPage>
                           ),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                           ),
                         ),
                       ],
@@ -249,7 +240,9 @@ class _PatientsPageState extends State<PatientsPage>
 
               const SizedBox(height: 8),
 
+              // ============================================
               // LISTA DE PACIENTES
+              // ============================================
               Expanded(
                 child: patients.isEmpty
                     ? _buildEmptyState()
@@ -261,13 +254,9 @@ class _PatientsPageState extends State<PatientsPage>
                           return PatientListItem(
                             patient: patient,
                             onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Perfil de ${patient.name} em breve',
-                                  ),
-                                  duration: const Duration(seconds: 1),
-                                ),
+                              AppRoutes.go(
+                                context,
+                                AppRoutes.nutritionistPatientDetail,
                               );
                             },
                           );
@@ -278,7 +267,6 @@ class _PatientsPageState extends State<PatientsPage>
           ),
         ),
       ),
-
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -296,9 +284,6 @@ class _PatientsPageState extends State<PatientsPage>
     );
   }
 
-  // ============================================
-  // BARRA DE BUSCA
-  // ============================================
   Widget _buildSearchBar() {
     return TextField(
       controller: _searchController,
@@ -318,9 +303,6 @@ class _PatientsPageState extends State<PatientsPage>
     );
   }
 
-  // ============================================
-  // ESTADO VAZIO
-  // ============================================
   Widget _buildEmptyState() {
     final hasSearch = _searchController.text.isNotEmpty;
 

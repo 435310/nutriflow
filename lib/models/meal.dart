@@ -18,15 +18,10 @@ class Meal {
     this.photoPath,
   });
 
-  /// Total estimado de calorias (quando tivermos banco de alimentos)
   double? get estimatedCalories {
     if (foods.isEmpty) return null;
-
-    // Verifica se TODOS os alimentos têm calorias
     final hasAllCalories = foods.every((food) => food.calories != null);
     if (!hasAllCalories) return null;
-
-    // Soma com segurança
     double total = 0.0;
     for (final food in foods) {
       total += food.calories ?? 0.0;
@@ -34,7 +29,6 @@ class Meal {
     return total;
   }
 
-  /// Resumo textual dos alimentos
   String get foodsSummary {
     if (foods.isEmpty) return 'Nenhum alimento registrado';
     return foods.map((f) => f.name).join(', ');
@@ -75,7 +69,6 @@ class FoodItem {
     this.calories,
   });
 
-  /// Texto formatado: "Frango grelhado — 100 g"
   String get display {
     final qty = quantity.truncate() == quantity
         ? quantity.toStringAsFixed(0)
