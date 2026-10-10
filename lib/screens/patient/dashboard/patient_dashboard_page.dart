@@ -52,23 +52,19 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   }
 
   void _handleNavTap(int index) {
-  setState(() {
-    _currentNavIndex = index;
-  });
+    setState(() {
+      _currentNavIndex = index;
+    });
 
-  if (index == 1) {
-    AppRoutes.go(context, AppRoutes.diary);
-  } else if (index == 2) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Evolução detalhada em breve'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-  } else if (index == 3) {
-    AppRoutes.go(context, AppRoutes.profile);
+    if (index == 1) {
+      AppRoutes.go(context, AppRoutes.diary);
+    } else if (index == 2) {
+      AppRoutes.go(context, AppRoutes.evolution);
+    } else if (index == 3) {
+      AppRoutes.go(context, AppRoutes.profile);
+    }
   }
-}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,7 +78,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Cabeçalho
                 GreetingHeader(
                   name: _profile.name,
                   notificationCount: 2,
@@ -98,40 +93,27 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 28),
 
-                // Card de Evolução
                 EvolutionCard(
                   currentWeight: _profile.currentWeightKg ?? 0,
                   initialWeight: _profile.initialWeightKg,
                   goalWeight: _profile.goalWeightKg,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Evolução detalhada em breve'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                    AppRoutes.go(context, AppRoutes.evolution);
                   },
                 ),
 
                 const SizedBox(height: 16),
 
-                // Card de Refeições
                 MealsTodayCard(
                   registered: 2,
                   total: 5,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Diário alimentar em breve'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                    AppRoutes.go(context, AppRoutes.diary);
                   },
                 ),
 
                 const SizedBox(height: 16),
 
-                // Card de Próxima refeição
                 const NextMealCard(
                   mealName: 'Almoço',
                   mealTime: '12:30',
@@ -143,7 +125,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // Dica do dia
                 const _TipsSection(),
 
                 const SizedBox(height: 100),
@@ -153,7 +134,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
         ),
       ),
 
-      // Botão flutuante
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           AppRoutes.go(context, AppRoutes.registerMeal);
@@ -164,7 +144,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
         child: const Icon(Icons.add, size: 28),
       ),
 
-      // Navegação inferior
       bottomNavigationBar: PatientBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,
