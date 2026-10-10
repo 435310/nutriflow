@@ -9,8 +9,6 @@ import '../test/avatar_test_page.dart';
 /// ============================================
 /// TELA: BOAS-VINDAS (com animações)
 /// ============================================
-/// Tela inicial do NutriFlow com animação de entrada
-/// profissional e micro-interações nos botões.
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
 
@@ -157,7 +155,7 @@ class _WelcomePageState extends State<WelcomePage>
     );
 
     // ============================================
-    // PULSE DO LOGO (contínuo, começa após entrada)
+    // PULSE DO LOGO (contínuo)
     // ============================================
     _pulseController = AnimationController(
       vsync: this,
@@ -171,10 +169,8 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // Inicia animação de entrada
     _entryController.forward();
 
-    // Inicia pulse depois que a entrada termina
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (mounted) {
         _pulseController.repeat(reverse: true);
@@ -193,14 +189,13 @@ class _WelcomePageState extends State<WelcomePage>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        // Fundo com gradiente sutil
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFF0FDF7), // verde muito claro no topo
-              Color(0xFFF8FAFC), // cinza claro no fundo
+              Color(0xFFF0FDF7),
+              Color(0xFFF8FAFC),
             ],
             stops: [0.0, 0.5],
           ),
@@ -214,7 +209,7 @@ class _WelcomePageState extends State<WelcomePage>
                 const Spacer(),
 
                 // ============================================
-                // LOGO ANIMADO (fade + scale + rotação + pulse)
+                // LOGO ANIMADO
                 // ============================================
                 FadeTransition(
                   opacity: _logoFade,
@@ -340,29 +335,43 @@ class _WelcomePageState extends State<WelcomePage>
                   ),
                 ),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
-                // ⚠️ BOTÃO TEMPORÁRIO PARA TESTE — REMOVER DEPOIS
-const SizedBox(height: 16),
-TextButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const AvatarTestPage(),
-      ),
-    );
-  },
-  child: const Text('🧪 Testar Avatar (temporário)'),
-),
+                // ============================================
+                // BOTÕES TEMPORÁRIOS PARA TESTE
+                // ⚠️ REMOVER QUANDO O APP ESTIVER PRONTO
+                // ============================================
 
-const SizedBox(height: 8),
-TextButton(
-  onPressed: () {
-    AppRoutes.go(context, AppRoutes.profile);
-  },
-  child: const Text('👤 Testar Perfil (temporário)'),
-),
+                // Testar Avatar
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AvatarTestPage(),
+                      ),
+                    );
+                  },
+                  child: const Text('🧪 Testar Avatar (temporário)'),
+                ),
+
+                // Testar Perfil
+                TextButton(
+                  onPressed: () {
+                    AppRoutes.go(context, AppRoutes.profile);
+                  },
+                  child: const Text('👤 Testar Perfil (temporário)'),
+                ),
+
+                // Testar Dashboard
+                TextButton(
+                  onPressed: () {
+                    AppRoutes.go(context, AppRoutes.patientDashboard);
+                  },
+                  child: const Text('🏠 Testar Dashboard (temporário)'),
+                ),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -375,8 +384,6 @@ TextButton(
 /// ============================================
 /// WIDGET: BOTÃO COM MICRO-INTERAÇÃO
 /// ============================================
-/// Ao pressionar, o botão "encolhe" levemente (98%),
-/// dando feedback tátil visual ao usuário.
 class _PressableButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onPressed;
