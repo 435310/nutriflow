@@ -13,6 +13,7 @@ import '../screens/patient/meal/register_meal_page.dart';
 import '../screens/patient/diary/diary_page.dart';
 import '../screens/patient/evolution/evolution_page.dart';
 import '../screens/nutritionist/dashboard/nutritionist_dashboard_page.dart';
+import '../screens/nutritionist/patients/patients_page.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -29,6 +30,7 @@ class AppRoutes {
   static const String diary = '/diary';
   static const String evolution = '/evolution';
   static const String nutritionistDashboard = '/nutritionist-dashboard';
+  static const String nutritionistPatients = '/nutritionist-patients';
 
   static Map<String, WidgetBuilder> get routes {
     return {
@@ -44,6 +46,7 @@ class AppRoutes {
       diary: (_) => const DiaryPage(),
       evolution: (_) => const EvolutionPage(),
       nutritionistDashboard: (_) => const NutritionistDashboardPage(),
+      nutritionistPatients: (_) => const PatientsPage(),
       '/avatar-test': (_) => const AvatarTestPage(),
     };
   }

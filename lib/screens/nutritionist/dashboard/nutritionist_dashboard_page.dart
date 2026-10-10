@@ -54,19 +54,18 @@ class _NutritionistDashboardPageState
   }
 
   void _handleNavTap(int index) {
-    setState(() {
-      _currentNavIndex = index;
-    });
+  setState(() {
+    _currentNavIndex = index;
+  });
 
-    if (index == 1) {
-      _showComingSoon('Lista de pacientes');
-    } else if (index == 2) {
-      _showComingSoon('Mensagens');
-    } else if (index == 3) {
-      _showComingSoon('Perfil do nutricionista');
-    }
+  if (index == 1) {
+    AppRoutes.go(context, AppRoutes.nutritionistPatients);
+  } else if (index == 2) {
+    _showComingSoon('Mensagens');
+  } else if (index == 3) {
+    _showComingSoon('Perfil do nutricionista');
   }
-
+}
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
