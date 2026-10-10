@@ -9,6 +9,7 @@ import '../screens/patient/profile/profile_page.dart';
 import '../screens/patient/profile/edit_profile_page.dart';
 import '../screens/test/avatar_test_page.dart';
 import '../screens/patient/dashboard/patient_dashboard_page.dart';
+import '../screens/patient/meal/register_meal_page.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -21,6 +22,7 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
   static const String patientDashboard = '/patient-dashboard';
+  static const String registerMeal = '/register-meal';
 
   static Map<String, WidgetBuilder> get routes {
     return {
@@ -32,6 +34,7 @@ class AppRoutes {
       profile: (_) => const ProfilePage(),
       editProfile: (_) => const EditProfilePage(),
       patientDashboard: (_) => const PatientDashboardPage(),
+      registerMeal: (_) => const RegisterMealPage(),
       '/avatar-test': (_) => const AvatarTestPage(),
     };
   }

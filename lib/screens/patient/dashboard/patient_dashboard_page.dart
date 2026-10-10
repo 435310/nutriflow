@@ -56,7 +56,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       _currentNavIndex = index;
     });
 
-    // Por enquanto, só mostra aviso
     if (index == 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -89,9 +88,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ============================================
-                // CABEÇALHO COM SAUDAÇÃO
-                // ============================================
+                // Cabeçalho
                 GreetingHeader(
                   name: _profile.name,
                   notificationCount: 2,
@@ -107,9 +104,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 28),
 
-                // ============================================
-                // CARD DE EVOLUÇÃO
-                // ============================================
+                // Card de Evolução
                 EvolutionCard(
                   currentWeight: _profile.currentWeightKg ?? 0,
                   initialWeight: _profile.initialWeightKg,
@@ -126,9 +121,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ============================================
-                // CARD DE REFEIÇÕES DE HOJE
-                // ============================================
+                // Card de Refeições
                 MealsTodayCard(
                   registered: 2,
                   total: 5,
@@ -144,9 +137,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ============================================
-                // CARD DE PRÓXIMA REFEIÇÃO
-                // ============================================
+                // Card de Próxima refeição
                 const NextMealCard(
                   mealName: 'Almoço',
                   mealTime: '12:30',
@@ -158,12 +149,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ============================================
-                // SEÇÃO: DICAS RÁPIDAS
-                // ============================================
+                // Dica do dia
                 const _TipsSection(),
 
-                const SizedBox(height: 100), // espaço pro botão flutuante
+                const SizedBox(height: 100),
               ],
             ),
           ),
@@ -173,12 +162,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       // Botão flutuante
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registrar refeição em breve'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          AppRoutes.go(context, AppRoutes.registerMeal);
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -196,7 +180,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 }
 
 // ============================================
-// WIDGET: SEÇÃO DE DICAS RÁPIDAS
+// WIDGET: SEÇÃO DE DICAS
 // ============================================
 class _TipsSection extends StatelessWidget {
   const _TipsSection();
