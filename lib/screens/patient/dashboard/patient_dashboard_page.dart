@@ -52,29 +52,23 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   }
 
   void _handleNavTap(int index) {
-    setState(() {
-      _currentNavIndex = index;
-    });
+  setState(() {
+    _currentNavIndex = index;
+  });
 
-    if (index == 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Diário alimentar em breve'),
-          duration: Duration(seconds: 1),
-        ),
-      );
-    } else if (index == 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Evolução detalhada em breve'),
-          duration: Duration(seconds: 1),
-        ),
-      );
-    } else if (index == 3) {
-      AppRoutes.go(context, AppRoutes.profile);
-    }
+  if (index == 1) {
+    AppRoutes.go(context, AppRoutes.diary);
+  } else if (index == 2) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Evolução detalhada em breve'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  } else if (index == 3) {
+    AppRoutes.go(context, AppRoutes.profile);
   }
-
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
