@@ -4,6 +4,7 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../widgets/evolution_card.dart';
 import '../../../widgets/greeting_header.dart';
 import '../../../widgets/meals_today_card.dart';
@@ -27,7 +28,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
   int _currentNavIndex = 0;
 
-  final PatientProfile _profile = PatientProfile.mock();
+  final _storage = LocalStorageService();
+  PatientProfile? _profile;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -43,6 +46,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     );
 
     _controller.forward();
+    _loadProfile();
   }
 
   @override
@@ -51,22 +55,46 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     super.dispose();
   }
 
-  void _handleNavTap(int index) {
+  Future<void> _loadProfile() async {
+    final stored = await _storage.loadProfile();
+    if (!mounted) return;
+
+    setState(() {
+      _profile = stored ?? PatientProfile.mock();
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _handleNavTap(int index) async {
     setState(() {
       _currentNavIndex = index;
     });
 
     if (index == 1) {
-      AppRoutes.go(context, AppRoutes.diary);
+      await Navigator.pushNamed(context, AppRoutes.diary);
     } else if (index == 2) {
-      AppRoutes.go(context, AppRoutes.evolution);
+      await Navigator.pushNamed(context, AppRoutes.evolution);
     } else if (index == 3) {
-      AppRoutes.go(context, AppRoutes.profile);
+      await Navigator.pushNamed(context, AppRoutes.profile);
     }
+
+    // Recarrega o perfil quando volta
+    if (mounted) _loadProfile();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading || _profile == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    final profile = _profile!;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -79,7 +107,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GreetingHeader(
-                  name: _profile.name,
+                  name: profile.name,
                   notificationCount: 2,
                   onNotificationTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -94,11 +122,12 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                 const SizedBox(height: 28),
 
                 EvolutionCard(
-                  currentWeight: _profile.currentWeightKg ?? 0,
-                  initialWeight: _profile.initialWeightKg,
-                  goalWeight: _profile.goalWeightKg,
-                  onTap: () {
-                    AppRoutes.go(context, AppRoutes.evolution);
+                  currentWeight: profile.currentWeightKg ?? 0,
+                  initialWeight: profile.initialWeightKg,
+                  goalWeight: profile.goalWeightKg,
+                  onTap: () async {
+                    await Navigator.pushNamed(context, AppRoutes.evolution);
+                    if (mounted) _loadProfile();
                   },
                 ),
 
@@ -107,8 +136,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                 MealsTodayCard(
                   registered: 2,
                   total: 5,
-                  onTap: () {
-                    AppRoutes.go(context, AppRoutes.diary);
+                  onTap: () async {
+                    await Navigator.pushNamed(context, AppRoutes.diary);
+                    if (mounted) _loadProfile();
                   },
                 ),
 
@@ -133,17 +163,16 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
           ),
         ),
       ),
-
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          AppRoutes.go(context, AppRoutes.registerMeal);
+        onPressed: () async {
+          await Navigator.pushNamed(context, AppRoutes.registerMeal);
+          if (mounted) _loadProfile();
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 4,
         child: const Icon(Icons.add, size: 28),
       ),
-
       bottomNavigationBar: PatientBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,

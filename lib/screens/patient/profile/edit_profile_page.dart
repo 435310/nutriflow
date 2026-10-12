@@ -5,6 +5,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
+import '../../../services/local_storage_service.dart';
 
 /// ============================================
 /// TELA: EDITAR PERFIL
@@ -19,7 +20,7 @@ class EditProfilePage extends StatefulWidget {
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers dos campos de texto
+  // Controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -29,35 +30,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _waistController = TextEditingController();
   final _initialWeightController = TextEditingController();
 
-  // Dados selecionados (dropdowns / date picker)
+  // Estados
   DateTime? _birthDate;
   Gender? _gender;
   Goal? _goal;
   ActivityLevel? _activityLevel;
+  bool _isSaving = false;
 
-  // Paciente atual (vem do mock por enquanto)
-  final PatientProfile _profile = PatientProfile.mock();
+  // Perfil atual
+  PatientProfile _profile = PatientProfile.mock();
+  final _storage = LocalStorageService();
 
   @override
   void initState() {
     super.initState();
-
-    // Pré-preenche os controllers com os dados atuais
-    _nameController.text = _profile.name;
-    _emailController.text = _profile.email;
-    _phoneController.text = _profile.phone ?? '';
-    _heightController.text = _profile.heightCm?.toStringAsFixed(0) ?? '';
-    _weightController.text = _profile.currentWeightKg?.toStringAsFixed(1) ?? '';
-    _goalWeightController.text =
-        _profile.goalWeightKg?.toStringAsFixed(1) ?? '';
-    _waistController.text = _profile.waistCm?.toStringAsFixed(0) ?? '';
-    _initialWeightController.text =
-        _profile.initialWeightKg?.toStringAsFixed(1) ?? '';
-
-    _birthDate = _profile.birthDate;
-    _gender = _profile.gender;
-    _goal = _profile.goal;
-    _activityLevel = _profile.activityLevel;
+    _loadProfile();
   }
 
   @override
@@ -71,6 +58,38 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _waistController.dispose();
     _initialWeightController.dispose();
     super.dispose();
+  }
+
+  // ============================================
+  // CARREGAR PERFIL DO STORAGE
+  // ============================================
+  Future<void> _loadProfile() async {
+    final stored = await _storage.loadProfile();
+    final profile = stored ?? PatientProfile.mock();
+
+    if (!mounted) return;
+
+    setState(() {
+      _profile = profile;
+
+      // Preenche os controllers
+      _nameController.text = profile.name;
+      _emailController.text = profile.email;
+      _phoneController.text = profile.phone ?? '';
+      _heightController.text = profile.heightCm?.toStringAsFixed(0) ?? '';
+      _weightController.text =
+          profile.currentWeightKg?.toStringAsFixed(1) ?? '';
+      _goalWeightController.text =
+          profile.goalWeightKg?.toStringAsFixed(1) ?? '';
+      _waistController.text = profile.waistCm?.toStringAsFixed(0) ?? '';
+      _initialWeightController.text =
+          profile.initialWeightKg?.toStringAsFixed(1) ?? '';
+
+      _birthDate = profile.birthDate;
+      _gender = profile.gender;
+      _goal = profile.goal;
+      _activityLevel = profile.activityLevel;
+    });
   }
 
   // ============================================
@@ -114,10 +133,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   // ============================================
-  // AÇÃO: SALVAR
+  // SALVAR
   // ============================================
-  void _handleSave() {
+  Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
 
     final updated = _profile.copyWith(
       name: _nameController.text.trim(),
@@ -140,17 +161,44 @@ class _EditProfilePageState extends State<EditProfilePage> {
       updatedAt: DateTime.now(),
     );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Perfil atualizado: ${updated.name}'),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    // ⚠️ SALVA NO STORAGE
+    print('═══════════════════════════════════');
+    print('>>> VOU SALVAR: ${updated.name}');
+    print('>>> PESO ATUAL: ${updated.currentWeightKg}');
+    print('═══════════════════════════════════');
+
+    final success = await _storage.saveProfile(updated);
+    print('>>> SAVE RETORNOU: $success');
+
+    if (!mounted) return;
+
+    setState(() => _isSaving = false);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Perfil atualizado: ${updated.name}'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) AppRoutes.back(context);
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível salvar'),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   // ============================================
-  // AÇÃO: CANCELAR
+  // CANCELAR
   // ============================================
   void _handleCancel() {
     AppRoutes.back(context);
@@ -172,9 +220,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
 
     if (picked != null) {
-      setState(() {
-        _birthDate = picked;
-      });
+      setState(() => _birthDate = picked);
     }
   }
 
@@ -207,7 +253,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ============================================
-                // SEÇÃO: DADOS PESSOAIS
+                // DADOS PESSOAIS
                 // ============================================
                 const _SectionTitle(
                   icon: Icons.person_outline,
@@ -255,7 +301,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Data de nascimento
                 InkWell(
                   onTap: _pickBirthDate,
                   borderRadius: BorderRadius.circular(14),
@@ -274,7 +319,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Sexo
                 DropdownButtonFormField<Gender>(
                   value: _gender,
                   decoration: const InputDecoration(
@@ -287,17 +331,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       child: Text(g.label),
                     );
                   }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _gender = value;
-                    });
-                  },
+                  onChanged: (value) => setState(() => _gender = value),
                 ),
 
                 const SizedBox(height: 32),
 
                 // ============================================
-                // SEÇÃO: DADOS CLÍNICOS
+                // DADOS CLÍNICOS
                 // ============================================
                 const _SectionTitle(
                   icon: Icons.monitor_weight_outlined,
@@ -306,7 +346,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 20),
 
-                // Altura
                 TextFormField(
                   controller: _heightController,
                   keyboardType:
@@ -322,7 +361,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Peso inicial
                 TextFormField(
                   controller: _initialWeightController,
                   keyboardType:
@@ -338,7 +376,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Peso atual
                 TextFormField(
                   controller: _weightController,
                   keyboardType:
@@ -354,7 +391,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Meta de peso
                 TextFormField(
                   controller: _goalWeightController,
                   keyboardType:
@@ -370,7 +406,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Circunferência abdominal
                 TextFormField(
                   controller: _waistController,
                   keyboardType:
@@ -385,7 +420,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                 const SizedBox(height: 16),
 
-                // Objetivo
                 DropdownButtonFormField<Goal>(
                   value: _goal,
                   decoration: const InputDecoration(
@@ -398,16 +432,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       child: Text('${g.icon} ${g.label}'),
                     );
                   }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _goal = value;
-                    });
-                  },
+                  onChanged: (value) => setState(() => _goal = value),
                 ),
 
                 const SizedBox(height: 16),
 
-                // Nível de atividade física
                 DropdownButtonFormField<ActivityLevel>(
                   value: _activityLevel,
                   decoration: const InputDecoration(
@@ -420,11 +449,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       child: Text('${level.label} — ${level.description}'),
                     );
                   }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _activityLevel = value;
-                    });
-                  },
+                  onChanged: (value) => setState(() => _activityLevel = value),
                 ),
 
                 const SizedBox(height: 32),
@@ -432,15 +457,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 // ============================================
                 // BOTÕES
                 // ============================================
-                ElevatedButton(
-                  onPressed: _handleSave,
-                  child: const Text('Salvar alterações'),
+                ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _handleSave,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check),
+                  label: Text(_isSaving ? 'Salvando...' : 'Salvar alterações'),
                 ),
 
                 const SizedBox(height: 12),
 
                 OutlinedButton(
-                  onPressed: _handleCancel,
+                  onPressed: _isSaving ? null : _handleCancel,
                   child: const Text('Cancelar'),
                 ),
 

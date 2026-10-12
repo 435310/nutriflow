@@ -5,6 +5,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
@@ -33,7 +34,9 @@ class _ProfilePageState extends State<ProfilePage>
   late Animation<double> _buttonFade;
   late Animation<Offset> _buttonSlide;
 
-  final PatientProfile _profile = PatientProfile.mock();
+  final _storage = LocalStorageService();
+  PatientProfile? _profile;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -130,6 +133,7 @@ class _ProfilePageState extends State<ProfilePage>
     );
 
     _controller.forward();
+    _loadProfile();
   }
 
   @override
@@ -138,8 +142,53 @@ class _ProfilePageState extends State<ProfilePage>
     super.dispose();
   }
 
+  // ============================================
+  // CARREGAR PERFIL
+  // ============================================
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await _storage.loadProfile();
+      if (!mounted) return;
+
+      setState(() {
+        _profile = profile ?? PatientProfile.mock();
+        _isLoading = false;
+      });
+
+      // Se não tem perfil salvo, salva o mock como inicial
+      if (profile == null) {
+        await _storage.saveProfile(_profile!);
+      }
+    } catch (e) {
+      print('Erro ao carregar perfil: $e');
+      if (!mounted) return;
+      setState(() {
+        _profile = PatientProfile.mock();
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading || _profile == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Meu Perfil'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => AppRoutes.back(context),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    final profile = _profile!;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Meu Perfil'),
@@ -153,22 +202,20 @@ class _ProfilePageState extends State<ProfilePage>
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              // Avatar
               FadeTransition(
                 opacity: _avatarFade,
                 child: UserAvatar(
-                  name: _profile.name,
+                  name: profile.name,
                   size: UserAvatarSize.large,
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // Nome
               FadeTransition(
                 opacity: _nameFade,
                 child: Text(
-                  _profile.name,
+                  profile.name,
                   style: AppTextStyles.h2,
                   textAlign: TextAlign.center,
                 ),
@@ -176,11 +223,10 @@ class _ProfilePageState extends State<ProfilePage>
 
               const SizedBox(height: 6),
 
-              // E-mail
               FadeTransition(
                 opacity: _emailFade,
                 child: Text(
-                  _profile.email,
+                  profile.email,
                   style: AppTextStyles.bodySecondary,
                   textAlign: TextAlign.center,
                 ),
@@ -188,7 +234,6 @@ class _ProfilePageState extends State<ProfilePage>
 
               const SizedBox(height: 32),
 
-              // Card 1: Dados pessoais
               FadeTransition(
                 opacity: _card1Fade,
                 child: SlideTransition(
@@ -199,17 +244,17 @@ class _ProfilePageState extends State<ProfilePage>
                     items: [
                       _InfoItem(
                         label: 'Telefone',
-                        value: _profile.phone ?? 'Não informado',
+                        value: profile.phone ?? 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Idade',
-                        value: _profile.age != null
-                            ? '${_profile.age} anos'
+                        value: profile.age != null
+                            ? '${profile.age} anos'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Sexo',
-                        value: _profile.gender?.label ?? 'Não informado',
+                        value: profile.gender?.label ?? 'Não informado',
                       ),
                     ],
                   ),
@@ -218,7 +263,6 @@ class _ProfilePageState extends State<ProfilePage>
 
               const SizedBox(height: 16),
 
-              // Card 2: Dados clínicos
               FadeTransition(
                 opacity: _card2Fade,
                 child: SlideTransition(
@@ -229,58 +273,58 @@ class _ProfilePageState extends State<ProfilePage>
                     items: [
                       _InfoItem(
                         label: 'Altura',
-                        value: _profile.heightCm != null
-                            ? '${(_profile.heightCm! / 100).toStringAsFixed(2)} m'
+                        value: profile.heightCm != null
+                            ? '${(profile.heightCm! / 100).toStringAsFixed(2)} m'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Peso inicial',
-                        value: _profile.initialWeightKg != null
-                            ? '${_profile.initialWeightKg!.toStringAsFixed(1)} kg'
+                        value: profile.initialWeightKg != null
+                            ? '${profile.initialWeightKg!.toStringAsFixed(1)} kg'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Peso atual',
-                        value: _profile.currentWeightKg != null
-                            ? '${_profile.currentWeightKg!.toStringAsFixed(1)} kg'
+                        value: profile.currentWeightKg != null
+                            ? '${profile.currentWeightKg!.toStringAsFixed(1)} kg'
                             : 'Não informado',
                       ),
-                      if (_profile.weightDelta != null &&
-                          _profile.weightDelta != 0)
+                      if (profile.weightDelta != null &&
+                          profile.weightDelta != 0)
                         _InfoItem(
                           label: 'Variação',
-                          value: _profile.weightDelta! < 0
-                              ? '▼ ${_profile.weightDelta!.abs().toStringAsFixed(1)} kg'
-                              : '▲ ${_profile.weightDelta!.toStringAsFixed(1)} kg',
+                          value: profile.weightDelta! < 0
+                              ? '▼ ${profile.weightDelta!.abs().toStringAsFixed(1)} kg'
+                              : '▲ ${profile.weightDelta!.toStringAsFixed(1)} kg',
                         ),
                       _InfoItem(
                         label: 'Meta',
-                        value: _profile.goalWeightKg != null
-                            ? '${_profile.goalWeightKg!.toStringAsFixed(1)} kg'
+                        value: profile.goalWeightKg != null
+                            ? '${profile.goalWeightKg!.toStringAsFixed(1)} kg'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'IMC',
-                        value: _profile.bmi != null
-                            ? '${_profile.bmi!.toStringAsFixed(1)} (${_profile.bmiCategory})'
+                        value: profile.bmi != null
+                            ? '${profile.bmi!.toStringAsFixed(1)} (${profile.bmiCategory})'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Cintura',
-                        value: _profile.waistCm != null
-                            ? '${_profile.waistCm!.toStringAsFixed(0)} cm'
-                                '${_profile.waistRisk != null ? ' (${_profile.waistRisk})' : ''}'
+                        value: profile.waistCm != null
+                            ? '${profile.waistCm!.toStringAsFixed(0)} cm'
+                                '${profile.waistRisk != null ? ' (${profile.waistRisk})' : ''}'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Objetivo',
-                        value: _profile.goal != null
-                            ? '${_profile.goal!.icon} ${_profile.goal!.label}'
+                        value: profile.goal != null
+                            ? '${profile.goal!.icon} ${profile.goal!.label}'
                             : 'Não informado',
                       ),
                       _InfoItem(
                         label: 'Atividade',
-                        value: _profile.activityLevel?.label ?? 'Não informado',
+                        value: profile.activityLevel?.label ?? 'Não informado',
                       ),
                     ],
                   ),
@@ -289,7 +333,6 @@ class _ProfilePageState extends State<ProfilePage>
 
               const SizedBox(height: 16),
 
-              // Card 3: Restrições
               FadeTransition(
                 opacity: _card3Fade,
                 child: SlideTransition(
@@ -300,15 +343,15 @@ class _ProfilePageState extends State<ProfilePage>
                     items: [
                       _InfoItem(
                         label: 'Restrições',
-                        value: _profile.foodRestrictions.isEmpty
+                        value: profile.foodRestrictions.isEmpty
                             ? 'Nenhuma'
-                            : _profile.foodRestrictions.join(', '),
+                            : profile.foodRestrictions.join(', '),
                       ),
                       _InfoItem(
                         label: 'Alergias',
-                        value: _profile.allergies.isEmpty
+                        value: profile.allergies.isEmpty
                             ? 'Nenhuma'
-                            : _profile.allergies.join(', '),
+                            : profile.allergies.join(', '),
                       ),
                     ],
                   ),
@@ -317,15 +360,16 @@ class _ProfilePageState extends State<ProfilePage>
 
               const SizedBox(height: 32),
 
-              // Botão Editar Perfil
               FadeTransition(
                 opacity: _buttonFade,
                 child: SlideTransition(
                   position: _buttonSlide,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      AppRoutes.go(context, AppRoutes.editProfile);
-                    },
+                   onPressed: () {
+  Navigator.pushNamed(context, AppRoutes.editProfile).then((_) {
+    _loadProfile();
+  });
+},
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Editar perfil'),
                   ),
