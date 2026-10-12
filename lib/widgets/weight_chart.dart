@@ -7,7 +7,6 @@ import '../models/weight_entry.dart';
 /// ============================================
 /// WIDGET: GRÁFICO DE EVOLUÇÃO DE PESO
 /// ============================================
-/// Gráfico de linha customizado (sem lib externa).
 class WeightChart extends StatelessWidget {
   final List<WeightEntry> entries;
   final double? goalWeight;
@@ -22,20 +21,71 @@ class WeightChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (entries.length < 2) {
+    // Caso 1: lista vazia
+    if (entries.isEmpty) {
       return SizedBox(
         height: height,
         child: Center(
-          child: Text(
-            'Registre pelo menos 2 pesos para ver o gráfico',
-            style: AppTextStyles.caption,
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.show_chart,
+                size: 32,
+                color: AppColors.textSecondary.withValues(alpha: 0.4),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Sem dados para exibir',
+                style: AppTextStyles.caption,
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       );
     }
 
-    // Ordena por data (mais antigo primeiro)
+    // Caso 2: só 1 registro — mostra um ponto sozinho
+    if (entries.length == 1) {
+      return SizedBox(
+        height: height,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${entries.first.weightKg.toStringAsFixed(1)} kg',
+                style: AppTextStyles.h3.copyWith(color: AppColors.primary),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Adicione mais registros para ver o gráfico',
+                style: AppTextStyles.caption,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Caso 3: 2+ registros — mostra o gráfico
     final sorted = List<WeightEntry>.from(entries)
       ..sort((a, b) => a.date.compareTo(b.date));
 
@@ -66,11 +116,8 @@ class _WeightChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (entries.isEmpty) return;
+    if (entries.length < 2) return;
 
-    // ============================================
-    // CONFIGURAÇÕES
-    // ============================================
     const double paddingLeft = 40;
     const double paddingRight = 12;
     const double paddingTop = 20;
@@ -79,9 +126,6 @@ class _WeightChartPainter extends CustomPainter {
     final chartWidth = size.width - paddingLeft - paddingRight;
     final chartHeight = size.height - paddingTop - paddingBottom;
 
-    // ============================================
-    // CALCULAR MIN/MAX
-    // ============================================
     double minWeight = entries.first.weightKg;
     double maxWeight = entries.first.weightKg;
 
@@ -90,14 +134,12 @@ class _WeightChartPainter extends CustomPainter {
       if (entry.weightKg > maxWeight) maxWeight = entry.weightKg;
     }
 
-    // Adiciona margem
     final range = maxWeight - minWeight;
     final margin = range > 0 ? range * 0.2 : 1.0;
 
     minWeight -= margin;
     maxWeight += margin;
 
-    // Se tiver meta, garante que ela apareça
     if (goalWeight != null) {
       if (goalWeight! < minWeight) minWeight = goalWeight! - margin;
       if (goalWeight! > maxWeight) maxWeight = goalWeight! + margin;
@@ -105,9 +147,6 @@ class _WeightChartPainter extends CustomPainter {
 
     final totalRange = maxWeight - minWeight;
 
-    // ============================================
-    // FUNÇÕES AUXILIARES
-    // ============================================
     double xForIndex(int index) {
       if (entries.length == 1) return paddingLeft + chartWidth / 2;
       return paddingLeft + (index / (entries.length - 1)) * chartWidth;
@@ -119,9 +158,7 @@ class _WeightChartPainter extends CustomPainter {
           ((weight - minWeight) / totalRange) * chartHeight;
     }
 
-    // ============================================
-    // LINHAS HORIZONTAIS (grid)
-    // ============================================
+    // Grid
     final gridPaint = Paint()
       ..color = AppColors.border
       ..strokeWidth = 1;
@@ -134,28 +171,25 @@ class _WeightChartPainter extends CustomPainter {
         gridPaint,
       );
 
-      // Labels do eixo Y
       final weight = maxWeight - (i / 3) * totalRange;
       _drawText(
         canvas,
-        '${weight.toStringAsFixed(0)}',
+        weight.toStringAsFixed(0),
         Offset(0, y - 8),
         width: paddingLeft - 6,
         align: TextAlign.right,
       );
     }
 
-    // ============================================
-    // LINHA DA META (tracejada)
-    // ============================================
+    // Linha da meta
     if (goalWeight != null) {
       final y = yForWeight(goalWeight!);
       final dashPaint = Paint()
         ..color = AppColors.warning.withValues(alpha: 0.6)
         ..strokeWidth = 2;
 
-      const dashWidth = 6;
-      const dashSpace = 4;
+      const dashWidth = 6.0;
+      const dashSpace = 4.0;
       double x = paddingLeft;
       while (x < size.width - paddingRight) {
         canvas.drawLine(
@@ -177,15 +211,14 @@ class _WeightChartPainter extends CustomPainter {
       );
     }
 
-    // ============================================
-    // ÁREA PREENCHIDA (gradiente)
-    // ============================================
+    // Área preenchida
     final areaPath = Path()..moveTo(paddingLeft, paddingTop + chartHeight);
 
     for (int i = 0; i < entries.length; i++) {
-      final x = xForIndex(i);
-      final y = yForWeight(entries[i].weightKg);
-      areaPath.lineTo(x, y);
+      areaPath.lineTo(
+        xForIndex(i),
+        yForWeight(entries[i].weightKg),
+      );
     }
 
     areaPath.lineTo(
@@ -208,9 +241,7 @@ class _WeightChartPainter extends CustomPainter {
 
     canvas.drawPath(areaPath, areaPaint);
 
-    // ============================================
-    // LINHA PRINCIPAL
-    // ============================================
+    // Linha principal
     final linePath = Path();
     for (int i = 0; i < entries.length; i++) {
       final x = xForIndex(i);
@@ -231,9 +262,7 @@ class _WeightChartPainter extends CustomPainter {
 
     canvas.drawPath(linePath, linePaint);
 
-    // ============================================
-    // PONTOS
-    // ============================================
+    // Pontos
     final pointPaint = Paint()..color = AppColors.primary;
     final pointBorderPaint = Paint()
       ..color = Colors.white
@@ -243,7 +272,6 @@ class _WeightChartPainter extends CustomPainter {
     for (int i = 0; i < entries.length; i++) {
       final x = xForIndex(i);
       final y = yForWeight(entries[i].weightKg);
-
       canvas.drawCircle(Offset(x, y), 5, pointPaint);
       canvas.drawCircle(Offset(x, y), 5, pointBorderPaint);
     }

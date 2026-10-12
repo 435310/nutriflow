@@ -5,6 +5,7 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
 import '../../../models/weight_entry.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../widgets/stats_card.dart';
 import '../../../widgets/weight_chart.dart';
 import '../../../widgets/weight_history_item.dart';
@@ -25,7 +26,11 @@ class _EvolutionPageState extends State<EvolutionPage>
   late Animation<double> _fadeIn;
 
   final PatientProfile _profile = PatientProfile.mock();
-  late List<WeightEntry> _entries;
+  final _storage = LocalStorageService();
+
+  // NUNCA null — sempre lista
+  List<WeightEntry> _entries = <WeightEntry>[];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -41,9 +46,7 @@ class _EvolutionPageState extends State<EvolutionPage>
     );
 
     _controller.forward();
-
-    // Mock de registros de peso
-    _entries = WeightEntry.mock();
+    _loadEntries();
   }
 
   @override
@@ -52,9 +55,24 @@ class _EvolutionPageState extends State<EvolutionPage>
     super.dispose();
   }
 
-  // ============================================
-  // REMOVER REGISTRO
-  // ============================================
+  Future<void> _loadEntries() async {
+    try {
+      final entries = await _storage.loadWeights();
+      if (!mounted) return;
+      setState(() {
+        _entries = entries ?? <WeightEntry>[];
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Erro ao carregar pesos: $e');
+      if (!mounted) return;
+      setState(() {
+        _entries = <WeightEntry>[];
+        _isLoading = false;
+      });
+    }
+  }
+
   void _handleDelete(WeightEntry entry) {
     showDialog(
       context: context,
@@ -69,11 +87,11 @@ class _EvolutionPageState extends State<EvolutionPage>
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _entries.removeWhere((e) => e.id == entry.id);
-              });
+            onPressed: () async {
+              await _storage.deleteWeight(entry.id);
+              if (!mounted) return;
               Navigator.pop(context);
+              _loadEntries();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Registro de ${entry.formattedDate} excluído'),
@@ -91,9 +109,6 @@ class _EvolutionPageState extends State<EvolutionPage>
     );
   }
 
-  // ============================================
-  // GETTERS DE CÁLCULO
-  // ============================================
   WeightEntry? get _latest {
     if (_entries.isEmpty) return null;
     final sorted = List<WeightEntry>.from(_entries)
@@ -117,6 +132,23 @@ class _EvolutionPageState extends State<EvolutionPage>
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Evolução'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => AppRoutes.back(context),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    // NUNCA dará erro agora — _entries é sempre lista
     final sortedDesc = List<WeightEntry>.from(_entries)
       ..sort((a, b) => b.date.compareTo(a.date));
 
@@ -137,61 +169,49 @@ class _EvolutionPageState extends State<EvolutionPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ============================================
-                // CARD DO GRÁFICO
-                // ============================================
                 _buildChartCard(),
-
                 const SizedBox(height: 16),
-
-                // ============================================
-                // CARD DE ESTATÍSTICAS
-                // ============================================
-                StatsCard(
-                  items: [
-                    StatItem(
-                      label: 'Peso inicial',
-                      value: _initialWeight != null
-                          ? '${_initialWeight!.toStringAsFixed(1)} kg'
-                          : '—',
-                      icon: Icons.flag_outlined,
-                    ),
-                    StatItem(
-                      label: 'Peso atual',
-                      value: _currentWeight != null
-                          ? '${_currentWeight!.toStringAsFixed(1)} kg'
-                          : '—',
-                      icon: Icons.monitor_weight_outlined,
-                    ),
-                    StatItem(
-                      label: 'Variação',
-                      value: _totalDelta != null
-                          ? '${_totalDelta! < 0 ? '▼' : '▲'} ${_totalDelta!.abs().toStringAsFixed(1)} kg'
-                          : '—',
-                      icon: _totalDelta != null && _totalDelta! < 0
-                          ? Icons.trending_down
-                          : Icons.trending_up,
-                      color: _totalDelta == null
-                          ? null
-                          : _totalDelta! < 0
-                              ? AppColors.success
-                              : AppColors.warning,
-                    ),
-                    StatItem(
-                      label: 'IMC',
-                      value: _profile.bmi != null
-                          ? _profile.bmi!.toStringAsFixed(1)
-                          : '—',
-                      icon: Icons.calculate_outlined,
-                    ),
-                  ],
-                ),
-
+                if (_entries.isNotEmpty)
+                  StatsCard(
+                    items: [
+                      StatItem(
+                        label: 'Peso inicial',
+                        value: _initialWeight != null
+                            ? '${_initialWeight!.toStringAsFixed(1)} kg'
+                            : '—',
+                        icon: Icons.flag_outlined,
+                      ),
+                      StatItem(
+                        label: 'Peso atual',
+                        value: _currentWeight != null
+                            ? '${_currentWeight!.toStringAsFixed(1)} kg'
+                            : '—',
+                        icon: Icons.monitor_weight_outlined,
+                      ),
+                      StatItem(
+                        label: 'Variação',
+                        value: _totalDelta != null
+                            ? '${_totalDelta! < 0 ? '▼' : '▲'} ${_totalDelta!.abs().toStringAsFixed(1)} kg'
+                            : '—',
+                        icon: _totalDelta != null && _totalDelta! < 0
+                            ? Icons.trending_down
+                            : Icons.trending_up,
+                        color: _totalDelta == null
+                            ? null
+                            : _totalDelta! < 0
+                                ? AppColors.success
+                                : AppColors.warning,
+                      ),
+                      StatItem(
+                        label: 'IMC',
+                        value: _profile.bmi != null
+                            ? _profile.bmi!.toStringAsFixed(1)
+                            : '—',
+                        icon: Icons.calculate_outlined,
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 28),
-
-                // ============================================
-                // HISTÓRICO
-                // ============================================
                 Row(
                   children: [
                     Text('Histórico', style: AppTextStyles.h3),
@@ -215,22 +235,16 @@ class _EvolutionPageState extends State<EvolutionPage>
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 16),
-
-                // Lista de registros ou estado vazio
                 if (_entries.isEmpty)
                   _buildEmptyState()
                 else
                   ...sortedDesc.asMap().entries.map((entry) {
                     final index = entry.key;
                     final weightEntry = entry.value;
-
-                    // Peso anterior (próximo na lista, mais antigo)
                     final previousWeight = index < sortedDesc.length - 1
                         ? sortedDesc[index + 1].weightKg
                         : null;
-
                     return WeightHistoryItem(
                       entry: weightEntry,
                       previousWeight: previousWeight,
@@ -247,23 +261,17 @@ class _EvolutionPageState extends State<EvolutionPage>
                       onDelete: () => _handleDelete(weightEntry),
                     );
                   }),
-
                 const SizedBox(height: 100),
               ],
             ),
           ),
         ),
       ),
-
-      // Botão flutuante
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registrar peso em breve'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+        onPressed: () async {
+          AppRoutes.go(context, AppRoutes.registerWeight);
+          await Future.delayed(const Duration(milliseconds: 500));
+          _loadEntries();
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -273,9 +281,6 @@ class _EvolutionPageState extends State<EvolutionPage>
     );
   }
 
-  // ============================================
-  // CARD DO GRÁFICO
-  // ============================================
   Widget _buildChartCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -294,7 +299,6 @@ class _EvolutionPageState extends State<EvolutionPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabeçalho
           Row(
             children: [
               Container(
@@ -314,10 +318,7 @@ class _EvolutionPageState extends State<EvolutionPage>
               Text('Evolução do peso', style: AppTextStyles.h3),
             ],
           ),
-
           const SizedBox(height: 20),
-
-          // Peso atual + delta
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -336,16 +337,12 @@ class _EvolutionPageState extends State<EvolutionPage>
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     'kg',
-                    style: AppTextStyles.bodySecondary.copyWith(
-                      fontSize: 16,
-                    ),
+                    style: AppTextStyles.bodySecondary.copyWith(fontSize: 16),
                   ),
                 ),
               ] else
                 Text('Sem dados', style: AppTextStyles.bodySecondary),
-
               const Spacer(),
-
               if (_totalDelta != null && _totalDelta != 0)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -387,10 +384,7 @@ class _EvolutionPageState extends State<EvolutionPage>
                 ),
             ],
           ),
-
           const SizedBox(height: 20),
-
-          // Gráfico
           WeightChart(
             entries: _entries,
             goalWeight: _profile.goalWeightKg,
@@ -400,9 +394,6 @@ class _EvolutionPageState extends State<EvolutionPage>
     );
   }
 
-  // ============================================
-  // ESTADO VAZIO
-  // ============================================
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,

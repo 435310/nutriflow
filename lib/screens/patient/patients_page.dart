@@ -291,21 +291,18 @@ class _PatientsPageState extends State<PatientsPage>
       ),
 
       // Botão flutuante
+            // BOTÃO FLUTUANTE
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Novo paciente em breve'),
-              duration: Duration(seconds: 1),
-            ),
-          );
+          AppRoutes.go(context, AppRoutes.registerWeight).then((_) {
+            _loadEntries();
+          });
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Novo paciente'),
+        icon: const Icon(Icons.add),
+        label: const Text('Registrar peso'),
       ),
-    );
   }
 
   // ============================================

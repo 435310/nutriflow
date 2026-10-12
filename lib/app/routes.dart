@@ -5,17 +5,17 @@ import '../screens/profile_choice/profile_choice_page.dart';
 import '../screens/auth/auth_choice_page.dart';
 import '../screens/auth/login_page.dart';
 import '../screens/auth/signup_page.dart';
+import '../screens/patient/dashboard/patient_dashboard_page.dart';
 import '../screens/patient/profile/profile_page.dart';
 import '../screens/patient/profile/edit_profile_page.dart';
-import '../screens/test/avatar_test_page.dart';
-import '../screens/patient/dashboard/patient_dashboard_page.dart';
 import '../screens/patient/meal/register_meal_page.dart';
 import '../screens/patient/diary/diary_page.dart';
 import '../screens/patient/evolution/evolution_page.dart';
+import '../screens/patient/evolution/register_weight_page.dart';
 import '../screens/nutritionist/dashboard/nutritionist_dashboard_page.dart';
 import '../screens/nutritionist/patients/patients_page.dart';
 import '../screens/nutritionist/patients/patient_detail_page.dart';
-
+import '../screens/test/avatar_test_page.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -25,12 +25,13 @@ class AppRoutes {
   static const String authChoice = '/auth-choice';
   static const String login = '/login';
   static const String signup = '/signup';
+  static const String patientDashboard = '/patient-dashboard';
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
-  static const String patientDashboard = '/patient-dashboard';
   static const String registerMeal = '/register-meal';
   static const String diary = '/diary';
   static const String evolution = '/evolution';
+  static const String registerWeight = '/register-weight';
   static const String nutritionistDashboard = '/nutritionist-dashboard';
   static const String nutritionistPatients = '/nutritionist-patients';
   static const String nutritionistPatientDetail = '/nutritionist-patient-detail';
@@ -42,12 +43,13 @@ class AppRoutes {
       authChoice: (_) => const AuthChoicePage(),
       login: (_) => const LoginPage(),
       signup: (_) => const SignupPage(),
+      patientDashboard: (_) => const PatientDashboardPage(),
       profile: (_) => const ProfilePage(),
       editProfile: (_) => const EditProfilePage(),
-      patientDashboard: (_) => const PatientDashboardPage(),
       registerMeal: (_) => const RegisterMealPage(),
       diary: (_) => const DiaryPage(),
       evolution: (_) => const EvolutionPage(),
+      registerWeight: (_) => const RegisterWeightPage(),
       nutritionistDashboard: (_) => const NutritionistDashboardPage(),
       nutritionistPatients: (_) => const PatientsPage(),
       nutritionistPatientDetail: (_) => const PatientDetailPage(),

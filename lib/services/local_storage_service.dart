@@ -8,19 +8,11 @@ import '../models/weight_entry.dart';
 /// ============================================
 /// SERVIÇO DE ARMAZENAMENTO LOCAL
 /// ============================================
-/// Salva e carrega dados no dispositivo usando SharedPreferences.
-/// Funciona como uma "camada" entre o app e o storage.
 class LocalStorageService {
-  // ============================================
-  // CHAVES
-  // ============================================
   static const String _keyProfile = 'patient_profile';
   static const String _keyWeights = 'weight_entries';
   static const String _keyOnboarded = 'is_onboarded';
 
-  // ============================================
-  // INSTÂNCIA ÚNICA (singleton)
-  // ============================================
   static final LocalStorageService _instance =
       LocalStorageService._internal();
 
@@ -29,10 +21,8 @@ class LocalStorageService {
   LocalStorageService._internal();
 
   // ============================================
-  // PERFIL DO PACIENTE
+  // PERFIL
   // ============================================
-
-  /// Salva o perfil do paciente
   Future<bool> saveProfile(PatientProfile profile) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -44,13 +34,11 @@ class LocalStorageService {
     }
   }
 
-  /// Carrega o perfil do paciente
   Future<PatientProfile?> loadProfile() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_keyProfile);
       if (jsonString == null) return null;
-
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
       return _profileFromJson(json);
     } catch (e) {
@@ -59,7 +47,6 @@ class LocalStorageService {
     }
   }
 
-  /// Remove o perfil
   Future<bool> deleteProfile() async {
     final prefs = await SharedPreferences.getInstance();
     return await prefs.remove(_keyProfile);
@@ -68,13 +55,10 @@ class LocalStorageService {
   // ============================================
   // REGISTROS DE PESO
   // ============================================
-
-  /// Salva um novo peso (adiciona à lista)
   Future<bool> saveWeight(WeightEntry entry) async {
     try {
       final entries = await loadWeights();
 
-      // Evita duplicata por data (mesmo dia = substitui)
       final today = DateTime(entry.date.year, entry.date.month, entry.date.day);
       entries.removeWhere((e) {
         final d = DateTime(e.date.year, e.date.month, e.date.day);
@@ -82,8 +66,6 @@ class LocalStorageService {
       });
 
       entries.add(entry);
-
-      // Ordena por data (mais antigo primeiro)
       entries.sort((a, b) => a.date.compareTo(b.date));
 
       return await _saveAllWeights(entries);
@@ -93,12 +75,12 @@ class LocalStorageService {
     }
   }
 
-  /// Carrega todos os pesos
+  /// SEMPRE retorna uma lista (nunca null)
   Future<List<WeightEntry>> loadWeights() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_keyWeights);
-      if (jsonString == null) return [];
+      if (jsonString == null) return <WeightEntry>[];
 
       final list = jsonDecode(jsonString) as List<dynamic>;
       return list
@@ -106,18 +88,21 @@ class LocalStorageService {
           .toList();
     } catch (e) {
       print('Erro ao carregar pesos: $e');
-      return [];
+      return <WeightEntry>[];
     }
   }
 
-  /// Remove um peso pelo ID
   Future<bool> deleteWeight(String id) async {
-    final entries = await loadWeights();
-    entries.removeWhere((e) => e.id == id);
-    return await _saveAllWeights(entries);
+    try {
+      final entries = await loadWeights();
+      entries.removeWhere((e) => e.id == id);
+      return await _saveAllWeights(entries);
+    } catch (e) {
+      print('Erro ao deletar peso: $e');
+      return false;
+    }
   }
 
-  /// Salva a lista inteira de pesos
   Future<bool> _saveAllWeights(List<WeightEntry> entries) async {
     final prefs = await SharedPreferences.getInstance();
     final list = entries.map((e) => _weightToJson(e)).toList();
@@ -125,9 +110,8 @@ class LocalStorageService {
   }
 
   // ============================================
-  // FLAG: JÁ PASSOU PELO ONBOARDING?
+  // ONBOARDING
   // ============================================
-
   Future<bool> isOnboarded() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_keyOnboarded) ?? false;
@@ -139,7 +123,7 @@ class LocalStorageService {
   }
 
   // ============================================
-  // LIMPAR TUDO (útil em logout)
+  // LIMPAR TUDO
   // ============================================
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
@@ -149,7 +133,6 @@ class LocalStorageService {
   // ============================================
   // CONVERSÃO PARA JSON
   // ============================================
-
   Map<String, dynamic> _profileToJson(PatientProfile p) {
     return {
       'id': p.id,
@@ -196,10 +179,10 @@ class LocalStorageService {
       activityLevel: json['activityLevel'] != null
           ? ActivityLevel.values.byName(json['activityLevel'] as String)
           : null,
-      foodRestrictions: (json['foodRestrictions'] as List<dynamic>?)
-              ?.cast<String>() ??
-          [],
-      allergies: (json['allergies'] as List<dynamic>?)?.cast<String>() ?? [],
+      foodRestrictions:
+          (json['foodRestrictions'] as List<dynamic>?)?.cast<String>() ?? [],
+      allergies:
+          (json['allergies'] as List<dynamic>?)?.cast<String>() ?? [],
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: json['updatedAt'] != null
