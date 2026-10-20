@@ -54,18 +54,19 @@ class _NutritionistDashboardPageState
   }
 
   void _handleNavTap(int index) {
-  setState(() {
-    _currentNavIndex = index;
-  });
+    setState(() {
+      _currentNavIndex = index;
+    });
 
-  if (index == 1) {
-    AppRoutes.go(context, AppRoutes.nutritionistPatients);
-  } else if (index == 2) {
-    _showComingSoon('Mensagens');
-  } else if (index == 3) {
-    _showComingSoon('Perfil do nutricionista');
+    if (index == 1) {
+      AppRoutes.go(context, AppRoutes.nutritionistPatients);
+    } else if (index == 2) {
+      _showComingSoon('Mensagens');
+    } else if (index == 3) {
+      _showComingSoon('Perfil do nutricionista');
+    }
   }
-}
+
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -162,7 +163,10 @@ class _NutritionistDashboardPageState
                     Text('Atividade recente', style: AppTextStyles.h3),
                     const Spacer(),
                     TextButton(
-                      onPressed: () => _showComingSoon('Ver todos'),
+                      onPressed: () {
+                        // Vai para a lista completa de pacientes
+                        _handleNavTap(1);
+                      },
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         padding: EdgeInsets.zero,
@@ -181,8 +185,12 @@ class _NutritionistDashboardPageState
                   ..._dashboard.recentPatients.map((patient) {
                     return PatientListItem(
                       patient: patient,
+                      // ⚠️ CORRIGIDO: Agora abre o perfil do paciente
                       onTap: () {
-                        _showComingSoon('Perfil de ${patient.name}');
+                        AppRoutes.go(
+                          context,
+                          AppRoutes.nutritionistPatientDetail,
+                        );
                       },
                     );
                   }),
