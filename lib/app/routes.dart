@@ -17,7 +17,8 @@ import '../screens/nutritionist/dashboard/nutritionist_dashboard_page.dart';
 import '../screens/nutritionist/patients/patients_page.dart';
 import '../screens/nutritionist/patients/patient_detail_page.dart';
 import '../screens/nutritionist/messages/nutritionist_messages_page.dart';
-import '../screens/nutritionist/profile/nutritionist_profile_page.dart'; // NOVO
+import '../screens/nutritionist/profile/nutritionist_profile_page.dart';
+import '../screens/nutritionist/profile/edit_nutritionist_profile_page.dart';
 import '../screens/chat/chat_page.dart';
 import '../screens/test/avatar_test_page.dart';
 
@@ -41,7 +42,8 @@ class AppRoutes {
   static const String nutritionistPatients = '/nutritionist-patients';
   static const String nutritionistPatientDetail = '/nutritionist-patient-detail';
   static const String nutritionistMessages = '/nutritionist-messages';
-  static const String nutritionistProfile = '/nutritionist-profile'; // NOVO
+  static const String nutritionistProfile = '/nutritionist-profile';
+  static const String editNutritionistProfile = '/edit-nutritionist-profile';
   static const String patientChat = '/patient-chat';
   static const String nutritionistChat = '/nutritionist-chat';
 
@@ -64,7 +66,8 @@ class AppRoutes {
       nutritionistPatients: (_) => const PatientsPage(),
       nutritionistPatientDetail: (_) => const PatientDetailPage(),
       nutritionistMessages: (_) => const NutritionistMessagesPage(),
-      nutritionistProfile: (_) => const NutritionistProfilePage(), // NOVO
+      nutritionistProfile: (_) => const NutritionistProfilePage(),
+      editNutritionistProfile: (_) => const EditNutritionistProfilePage(),
       patientChat: (_) => const ChatPage(isNutritionist: false, otherPartyName: 'Dra. Ana'),
       nutritionistChat: (_) => const ChatPage(isNutritionist: true, otherPartyName: 'Maria Silva'),
       '/avatar-test': (_) => const AvatarTestPage(),
