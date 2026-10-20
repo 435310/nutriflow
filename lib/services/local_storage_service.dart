@@ -4,12 +4,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/chat_message.dart';
 import '../models/meal.dart';
+import '../models/nutritionist_profile.dart';
 import '../models/patient_profile.dart';
 import '../models/symptom_report.dart';
 import '../models/weight_entry.dart';
 
+/// ============================================
+/// SERVIÇO DE ARMAZENAMENTO LOCAL
+/// ============================================
 class LocalStorageService {
   static const String _keyProfile = 'patient_profile';
+  static const String _keyNutritionistProfile = 'nutritionist_profile';
   static const String _keyWeights = 'weight_entries';
   static const String _keyOnboarded = 'is_onboarded';
   static const String _keyMeals = 'meal_entries';
@@ -21,7 +26,7 @@ class LocalStorageService {
   LocalStorageService._internal();
 
   // ============================================
-  // PERFIL
+  // PERFIL DO PACIENTE
   // ============================================
   Future<bool> saveProfile(PatientProfile profile) async {
     try {
@@ -38,6 +43,50 @@ class LocalStorageService {
       final jsonString = prefs.getString(_keyProfile);
       if (jsonString == null) return null;
       return _profileFromJson(jsonDecode(jsonString));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ============================================
+  // PERFIL DO NUTRICIONISTA
+  // ============================================
+  Future<bool> saveNutritionistProfile(NutritionistProfile profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = {
+        'id': profile.id,
+        'name': profile.name,
+        'email': profile.email,
+        'crn': profile.crn,
+        'specialty': profile.specialty,
+        'bio': profile.bio,
+        'createdAt': profile.createdAt.toIso8601String(),
+        'updatedAt': profile.updatedAt?.toIso8601String(),
+      };
+      return await prefs.setString(_keyNutritionistProfile, jsonEncode(json));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<NutritionistProfile?> loadNutritionistProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_keyNutritionistProfile);
+      if (jsonString == null) return null;
+
+      final json = jsonDecode(jsonString) as Map<String, dynamic>;
+      return NutritionistProfile(
+        id: json['id'],
+        name: json['name'],
+        email: json['email'],
+        crn: json['crn'],
+        specialty: json['specialty'],
+        bio: json['bio'],
+        createdAt: DateTime.parse(json['createdAt']),
+        updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      );
     } catch (e) {
       return null;
     }
@@ -222,6 +271,24 @@ class LocalStorageService {
   Future<bool> _saveAllChatMessages(List<ChatMessage> messages) async {
     final prefs = await SharedPreferences.getInstance();
     return await prefs.setString(_keyChat, jsonEncode(messages.map((m) => _chatMessageToJson(m)).toList()));
+  }
+
+  // ============================================
+  // ONBOARDING
+  // ============================================
+  Future<bool> isOnboarded() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyOnboarded) ?? false;
+  }
+
+  Future<void> setOnboarded(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyOnboarded, value);
+  }
+
+  Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   }
 
   // ============================================

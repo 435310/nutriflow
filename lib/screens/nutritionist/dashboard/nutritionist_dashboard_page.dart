@@ -30,7 +30,7 @@ class _NutritionistDashboardPageState
 
   final _storage = LocalStorageService();
   int _currentNavIndex = 0;
-  int _unreadMessages = 0; // ⚠️ Contador de mensagens
+  int _unreadMessages = 0;
 
   final NutritionistDashboard _dashboard = NutritionistDashboard.mock();
 
@@ -48,7 +48,7 @@ class _NutritionistDashboardPageState
     );
 
     _controller.forward();
-    _loadUnreadMessages(); // ⚠️ Carrega as mensagens
+    _loadUnreadMessages();
   }
 
   @override
@@ -57,7 +57,6 @@ class _NutritionistDashboardPageState
     super.dispose();
   }
 
-  // ⚠️ LÊ AS MENSAGENS NÃO LIDAS
   Future<void> _loadUnreadMessages() async {
     final count = await _storage.countUnreadMessages(forNutritionist: true);
     if (mounted) {
@@ -67,22 +66,20 @@ class _NutritionistDashboardPageState
     }
   }
 
-  void _handleNavTap(int index) async {
+  Future<void> _handleNavTap(int index) async {
     setState(() {
       _currentNavIndex = index;
     });
 
     if (index == 1) {
       await Navigator.pushNamed(context, AppRoutes.nutritionistPatients);
-      // Ao voltar, atualiza a contagem de mensagens
       _loadUnreadMessages();
     } else if (index == 2) {
-      // Abre a tela de lista de mensagens
       await Navigator.pushNamed(context, AppRoutes.nutritionistMessages);
-      // Ao voltar, atualiza a contagem de mensagens
       _loadUnreadMessages();
     } else if (index == 3) {
-      _showComingSoon('Perfil do nutricionista');
+      await Navigator.pushNamed(context, AppRoutes.nutritionistProfile);
+      _loadUnreadMessages();
     }
   }
 
@@ -95,9 +92,6 @@ class _NutritionistDashboardPageState
     );
   }
 
-  // ============================================
-  // SAUDAÇÃO
-  // ============================================
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Bom dia';
@@ -187,7 +181,7 @@ class _NutritionistDashboardPageState
                 if (_dashboard.recentPatients.isEmpty)
                   _buildEmptyState()
                 else
-                                    ..._dashboard.recentPatients.map((patient) {
+                  ..._dashboard.recentPatients.map((patient) {
                     return PatientListItem(
                       patient: patient,
                       onTap: () async {
@@ -215,7 +209,6 @@ class _NutritionistDashboardPageState
         label: const Text('Novo paciente'),
       ),
 
-      // ⚠️ PASSA O CONTADOR PARA A BARRA INFERIOR
       bottomNavigationBar: NutritionistBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,
