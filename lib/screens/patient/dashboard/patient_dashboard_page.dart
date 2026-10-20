@@ -30,6 +30,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
   final _storage = LocalStorageService();
   PatientProfile? _profile;
+  int _mealsTodayCount = 0;
   bool _isLoading = true;
 
   @override
@@ -46,7 +47,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     );
 
     _controller.forward();
-    _loadProfile();
+    _loadData();
   }
 
   @override
@@ -55,14 +56,32 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     super.dispose();
   }
 
-  Future<void> _loadProfile() async {
-    final stored = await _storage.loadProfile();
-    if (!mounted) return;
+  // ============================================
+  // CARREGAR PERFIL E REFEIÇÕES
+  // ============================================
+  Future<void> _loadData() async {
+    try {
+      // Carrega perfil
+      final profile = await _storage.loadProfile();
+      
+      // Carrega refeições de hoje
+      final mealsToday = await _storage.loadMealsByDate(DateTime.now());
+      
+      if (!mounted) return;
 
-    setState(() {
-      _profile = stored ?? PatientProfile.mock();
-      _isLoading = false;
-    });
+      setState(() {
+        _profile = profile ?? PatientProfile.mock();
+        _mealsTodayCount = mealsToday.length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Erro ao carregar dashboard: $e');
+      if (!mounted) return;
+      setState(() {
+        _profile = PatientProfile.mock();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _handleNavTap(int index) async {
@@ -78,8 +97,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       await Navigator.pushNamed(context, AppRoutes.profile);
     }
 
-    // Recarrega o perfil quando volta
-    if (mounted) _loadProfile();
+    // Recarrega quando volta
+    if (mounted) _loadData();
   }
 
   @override
@@ -127,18 +146,19 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                   goalWeight: profile.goalWeightKg,
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.evolution);
-                    if (mounted) _loadProfile();
+                    if (mounted) _loadData();
                   },
                 ),
 
                 const SizedBox(height: 16),
 
+                // ⚠️ AGORA USA O CONTADOR REAL
                 MealsTodayCard(
-                  registered: 2,
+                  registered: _mealsTodayCount,
                   total: 5,
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.diary);
-                    if (mounted) _loadProfile();
+                    if (mounted) _loadData();
                   },
                 ),
 
@@ -166,7 +186,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.pushNamed(context, AppRoutes.registerMeal);
-          if (mounted) _loadProfile();
+          if (mounted) _loadData();
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
