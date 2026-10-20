@@ -12,6 +12,7 @@ import '../../../widgets/meals_today_card.dart';
 import '../../../widgets/next_meal_card.dart';
 import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart';
+import '../../../widgets/nf_loading.dart';
 
 /// ============================================
 /// TELA: DASHBOARD DO PACIENTE
@@ -105,9 +106,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     if (_isLoading || _profile == null) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+                body: const NFLoading(message: 'Buscando seu progresso...'),
+      
       );
     }
 
