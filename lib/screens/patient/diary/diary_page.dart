@@ -8,6 +8,7 @@ import '../../../services/local_storage_service.dart';
 import '../../../widgets/daily_total_card.dart';
 import '../../../widgets/meal_card.dart';
 
+
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
 

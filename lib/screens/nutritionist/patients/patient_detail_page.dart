@@ -5,6 +5,7 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
 import '../../../models/patient_detail.dart';
+import '../../../models/symptom_report.dart';
 import '../../../widgets/mini_weight_chart.dart';
 import '../../../widgets/patient_detail_section.dart';
 import '../../../widgets/user_avatar.dart';
@@ -104,12 +105,9 @@ class _PatientDetailPageState extends State<PatientDetailPage>
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                // CABEÇALHO
                 _buildHeader(profile),
-
                 const SizedBox(height: 28),
 
-                // RESUMO
                 PatientDetailSection(
                   icon: Icons.insights_outlined,
                   title: 'Resumo',
@@ -150,7 +148,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
-                // EVOLUÇÃO DE PESO
                 PatientDetailSection(
                   icon: Icons.show_chart,
                   title: 'Evolução de peso',
@@ -188,7 +185,34 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
-                // ÚLTIMAS REFEIÇÕES
+                // ============================================
+                // SINTOMAS E DIFICULDADES
+                // ============================================
+                PatientDetailSection(
+                  icon: Icons.psychology_outlined,
+                  title: 'Sintomas e dificuldades',
+                  trailing: _detail.recentSymptoms.isNotEmpty
+                      ? TextButton(
+                          onPressed: () => _showComingSoon('Ver todos'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: const Text('Ver todos'),
+                        )
+                      : null,
+                  child: _detail.recentSymptoms.isEmpty
+                      ? _buildEmptyInfo('Nenhum relato de sintomas')
+                      : Column(
+                          children: _detail.recentSymptoms
+                              .take(2)
+                              .map((report) => _buildSymptomRow(report))
+                              .toList(),
+                        ),
+                ),
+
+                const SizedBox(height: 16),
+
                 PatientDetailSection(
                   icon: Icons.restaurant_menu,
                   title: 'Últimas refeições',
@@ -211,7 +235,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
-                // ÚLTIMOS EXAMES
                 PatientDetailSection(
                   icon: Icons.description_outlined,
                   title: 'Últimos exames',
@@ -234,7 +257,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
-                // ÚLTIMAS MENSAGENS
                 PatientDetailSection(
                   icon: Icons.chat_bubble_outline,
                   title: 'Últimas mensagens',
@@ -257,7 +279,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 24),
 
-                // BOTÕES DE AÇÃO
                 ElevatedButton.icon(
                   onPressed: () => _showComingSoon('Enviar mensagem'),
                   icon: const Icon(Icons.chat_bubble_outline),
@@ -486,6 +507,82 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     );
   }
 
+  // ============================================
+  // LINHA DE SINTOMAS
+  // ============================================
+  Widget _buildSymptomRow(SymptomReport report) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                height: 32,
+                width: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9B51E0).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.psychology_outlined,
+                  size: 18,
+                  color: Color(0xFF9B51E0),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  report.summary,
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Text(
+                '${report.date.day}/${report.date.month}',
+                style: AppTextStyles.caption,
+              ),
+            ],
+          ),
+          if (report.symptoms.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: report.symptoms
+                  .map((s) => _SymptomTag(label: s, color: AppColors.error))
+                  .toList(),
+            ),
+          ],
+          if (report.difficulties.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: report.difficulties
+                  .map((d) => _SymptomTag(label: d, color: AppColors.warning))
+                  .toList(),
+            ),
+          ],
+          if (report.notes != null && report.notes!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              report.notes!,
+              style: AppTextStyles.caption.copyWith(fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyInfo(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -498,6 +595,9 @@ class _PatientDetailPageState extends State<PatientDetailPage>
   }
 }
 
+// ============================================
+// BOTTOM SHEET: OPÇÕES
+// ============================================
 class _OptionsBottomSheet extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onArchive;
@@ -556,6 +656,38 @@ class _OptionsBottomSheet extends StatelessWidget {
             onTap: onDelete,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================
+// WIDGET: TAG DE SINTOMA
+// ============================================
+class _SymptomTag extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _SymptomTag({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
       ),
     );
   }

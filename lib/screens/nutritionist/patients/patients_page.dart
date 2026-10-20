@@ -253,6 +253,7 @@ class _PatientsPageState extends State<PatientsPage>
                           final patient = patients[index];
                           return PatientListItem(
                             patient: patient,
+                            // ⚠️ AQUI ESTÁ A CORREÇÃO
                             onTap: () {
                               AppRoutes.go(
                                 context,

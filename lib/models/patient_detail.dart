@@ -1,17 +1,18 @@
 import 'meal.dart';
 import 'patient_profile.dart';
+import 'symptom_report.dart';
 import 'weight_entry.dart';
 
 /// ============================================
 /// MODELO: PACIENTE DETALHADO (visão do nutricionista)
 /// ============================================
-/// Reúne todos os dados de um paciente em um só lugar.
 class PatientDetail {
   final PatientProfile profile;
   final List<WeightEntry> weightHistory;
   final List<Meal> recentMeals;
   final List<PatientExam> recentExams;
   final List<PatientMessage> recentMessages;
+  final List<SymptomReport> recentSymptoms;
 
   const PatientDetail({
     required this.profile,
@@ -19,6 +20,7 @@ class PatientDetail {
     this.recentMeals = const [],
     this.recentExams = const [],
     this.recentMessages = const [],
+    this.recentSymptoms = const [],
   });
 
   /// Mock completo com dados fictícios
@@ -87,6 +89,21 @@ class PatientDetail {
           isRead: true,
         ),
       ],
+      recentSymptoms: [
+        SymptomReport(
+          id: 's1',
+          date: now.subtract(const Duration(days: 1)),
+          symptoms: const ['Cansaço / Fadiga', 'Inchaço'],
+          difficulties: const ['Ansiedade'],
+          notes: 'Me senti muito cansada esta semana.',
+        ),
+        SymptomReport(
+          id: 's2',
+          date: now.subtract(const Duration(days: 5)),
+          symptoms: const ['Intestino preso'],
+          difficulties: const ['Falta de tempo'],
+        ),
+      ],
     );
   }
 }
@@ -118,8 +135,8 @@ class PatientExam {
 }
 
 enum ExamStatus {
-  pending,   // aguardando análise
-  reviewed,  // já analisado
+  pending,
+  reviewed,
 }
 
 extension ExamStatusExtension on ExamStatus {
