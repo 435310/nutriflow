@@ -4,6 +4,7 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/nutritionist_dashboard.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../widgets/nutritionist_bottom_nav.dart';
 import '../../../widgets/patient_list_item.dart';
 import '../../../widgets/patient_summary_card.dart';
@@ -27,7 +28,9 @@ class _NutritionistDashboardPageState
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
+  final _storage = LocalStorageService();
   int _currentNavIndex = 0;
+  int _unreadMessages = 0; // ⚠️ Contador de mensagens
 
   final NutritionistDashboard _dashboard = NutritionistDashboard.mock();
 
@@ -45,6 +48,7 @@ class _NutritionistDashboardPageState
     );
 
     _controller.forward();
+    _loadUnreadMessages(); // ⚠️ Carrega as mensagens
   }
 
   @override
@@ -53,15 +57,30 @@ class _NutritionistDashboardPageState
     super.dispose();
   }
 
-  void _handleNavTap(int index) {
+  // ⚠️ LÊ AS MENSAGENS NÃO LIDAS
+  Future<void> _loadUnreadMessages() async {
+    final count = await _storage.countUnreadMessages(forNutritionist: true);
+    if (mounted) {
+      setState(() {
+        _unreadMessages = count;
+      });
+    }
+  }
+
+  void _handleNavTap(int index) async {
     setState(() {
       _currentNavIndex = index;
     });
 
     if (index == 1) {
-      AppRoutes.go(context, AppRoutes.nutritionistPatients);
+      await Navigator.pushNamed(context, AppRoutes.nutritionistPatients);
+      // Ao voltar, atualiza a contagem de mensagens
+      _loadUnreadMessages();
     } else if (index == 2) {
-      _showComingSoon('Mensagens');
+      // Abre a tela de lista de mensagens
+      await Navigator.pushNamed(context, AppRoutes.nutritionistMessages);
+      // Ao voltar, atualiza a contagem de mensagens
+      _loadUnreadMessages();
     } else if (index == 3) {
       _showComingSoon('Perfil do nutricionista');
     }
@@ -99,16 +118,10 @@ class _NutritionistDashboardPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ============================================
-                // CABEÇALHO
-                // ============================================
                 _buildHeader(),
 
                 const SizedBox(height: 28),
 
-                // ============================================
-                // CARD DE TOTAL DE PACIENTES
-                // ============================================
                 PatientSummaryCard(
                   total: _dashboard.totalPatients,
                   label: 'Pacientes ativos',
@@ -117,9 +130,6 @@ class _NutritionistDashboardPageState
 
                 const SizedBox(height: 20),
 
-                // ============================================
-                // STATUS DOS PACIENTES
-                // ============================================
                 Text('Status dos pacientes', style: AppTextStyles.h3),
 
                 const SizedBox(height: 14),
@@ -155,16 +165,12 @@ class _NutritionistDashboardPageState
 
                 const SizedBox(height: 28),
 
-                // ============================================
-                // PACIENTES RECENTES
-                // ============================================
                 Row(
                   children: [
                     Text('Atividade recente', style: AppTextStyles.h3),
                     const Spacer(),
                     TextButton(
                       onPressed: () {
-                        // Vai para a lista completa de pacientes
                         _handleNavTap(1);
                       },
                       style: TextButton.styleFrom(
@@ -178,19 +184,18 @@ class _NutritionistDashboardPageState
 
                 const SizedBox(height: 12),
 
-                // Lista de pacientes
                 if (_dashboard.recentPatients.isEmpty)
                   _buildEmptyState()
                 else
-                  ..._dashboard.recentPatients.map((patient) {
+                                    ..._dashboard.recentPatients.map((patient) {
                     return PatientListItem(
                       patient: patient,
-                      // ⚠️ CORRIGIDO: Agora abre o perfil do paciente
-                      onTap: () {
-                        AppRoutes.go(
+                      onTap: () async {
+                        await Navigator.pushNamed(
                           context,
                           AppRoutes.nutritionistPatientDetail,
                         );
+                        _loadUnreadMessages();
                       },
                     );
                   }),
@@ -202,7 +207,6 @@ class _NutritionistDashboardPageState
         ),
       ),
 
-      // Botão flutuante
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showComingSoon('Novo paciente'),
         backgroundColor: AppColors.primary,
@@ -211,29 +215,23 @@ class _NutritionistDashboardPageState
         label: const Text('Novo paciente'),
       ),
 
-      // Navegação inferior
+      // ⚠️ PASSA O CONTADOR PARA A BARRA INFERIOR
       bottomNavigationBar: NutritionistBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,
+        unreadCount: _unreadMessages,
       ),
     );
   }
 
-  // ============================================
-  // CABEÇALHO
-  // ============================================
   Widget _buildHeader() {
     return Row(
       children: [
-        // Avatar
         const UserAvatar(
           name: 'Dra. Ana Costa',
           size: UserAvatarSize.medium,
         ),
-
         const SizedBox(width: 14),
-
-        // Textos
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,8 +250,6 @@ class _NutritionistDashboardPageState
             ],
           ),
         ),
-
-        // Notificações
         Stack(
           clipBehavior: Clip.none,
           children: [
@@ -305,9 +301,6 @@ class _NutritionistDashboardPageState
     );
   }
 
-  // ============================================
-  // ESTADO VAZIO
-  // ============================================
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,

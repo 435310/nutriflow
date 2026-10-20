@@ -8,11 +8,13 @@ import '../core/theme/colors.dart';
 class NutritionistBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final int unreadCount; // ⚠️ Novo parâmetro para o badge
 
   const NutritionistBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.unreadCount = 0,
   });
 
   @override
@@ -46,23 +48,34 @@ class NutritionistBottomNav extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
           unselectedLabelStyle: const TextStyle(fontSize: 12),
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: 'Início',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.people_outline),
               activeIcon: Icon(Icons.people),
               label: 'Pacientes',
             ),
+            // ⚠️ ABA DE MENSAGENS COM BADGE
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
+              icon: Badge(
+                isLabelVisible: unreadCount > 0,
+                label: Text('${unreadCount > 99 ? '99+' : unreadCount}'),
+                backgroundColor: AppColors.error,
+                child: const Icon(Icons.chat_bubble_outline),
+              ),
+              activeIcon: Badge(
+                isLabelVisible: unreadCount > 0,
+                label: Text('$unreadCount'),
+                backgroundColor: AppColors.error,
+                child: const Icon(Icons.chat_bubble),
+              ),
               label: 'Mensagens',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'Perfil',
