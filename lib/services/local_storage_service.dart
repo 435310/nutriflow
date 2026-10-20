@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/meal.dart';
 import '../models/patient_profile.dart';
 import '../models/weight_entry.dart';
 
@@ -12,6 +13,7 @@ class LocalStorageService {
   static const String _keyProfile = 'patient_profile';
   static const String _keyWeights = 'weight_entries';
   static const String _keyOnboarded = 'is_onboarded';
+  static const String _keyMeals = 'meal_entries';
 
   static final LocalStorageService _instance =
       LocalStorageService._internal();
@@ -75,7 +77,6 @@ class LocalStorageService {
     }
   }
 
-  /// SEMPRE retorna uma lista (nunca null)
   Future<List<WeightEntry>> loadWeights() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -110,6 +111,63 @@ class LocalStorageService {
   }
 
   // ============================================
+  // REFEIÇÕES
+  // ============================================
+  Future<bool> saveMeal(Meal meal) async {
+    try {
+      final meals = await loadMeals();
+      meals.add(meal);
+      meals.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      return await _saveAllMeals(meals);
+    } catch (e) {
+      print('Erro ao salvar refeição: $e');
+      return false;
+    }
+  }
+
+  Future<List<Meal>> loadMeals() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_keyMeals);
+      if (jsonString == null) return <Meal>[];
+
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      return list
+          .map((item) => _mealFromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Erro ao carregar refeições: $e');
+      return <Meal>[];
+    }
+  }
+
+  Future<List<Meal>> loadMealsByDate(DateTime date) async {
+    final all = await loadMeals();
+    return all.where((meal) {
+      return meal.dateTime.year == date.year &&
+          meal.dateTime.month == date.month &&
+          meal.dateTime.day == date.day;
+    }).toList();
+  }
+
+  Future<bool> deleteMeal(String id) async {
+    try {
+      final meals = await loadMeals();
+      meals.removeWhere((m) => m.id == id);
+      return await _saveAllMeals(meals);
+    } catch (e) {
+      print('Erro ao deletar refeição: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _saveAllMeals(List<Meal> meals) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = meals.map((m) => _mealToJson(m)).toList();
+    return await prefs.setString(_keyMeals, jsonEncode(list));
+  }
+
+  // ============================================
   // ONBOARDING
   // ============================================
   Future<bool> isOnboarded() async {
@@ -131,7 +189,7 @@ class LocalStorageService {
   }
 
   // ============================================
-  // CONVERSÃO PARA JSON
+  // CONVERSÃO PARA JSON — PERFIL
   // ============================================
   Map<String, dynamic> _profileToJson(PatientProfile p) {
     return {
@@ -191,6 +249,9 @@ class LocalStorageService {
     );
   }
 
+  // ============================================
+  // CONVERSÃO PARA JSON — PESO
+  // ============================================
   Map<String, dynamic> _weightToJson(WeightEntry w) {
     return {
       'id': w.id,
@@ -206,6 +267,50 @@ class LocalStorageService {
       date: DateTime.parse(json['date'] as String),
       weightKg: (json['weightKg'] as num).toDouble(),
       notes: json['notes'] as String?,
+    );
+  }
+
+  // ============================================
+  // CONVERSÃO PARA JSON — REFEIÇÕES
+  // ============================================
+  Map<String, dynamic> _mealToJson(Meal meal) {
+    return {
+      'id': meal.id,
+      'type': meal.type.name,
+      'dateTime': meal.dateTime.toIso8601String(),
+      'notes': meal.notes,
+      'photoPath': meal.photoPath,
+      'foods': meal.foods.map((f) => {
+            'name': f.name,
+            'quantity': f.quantity,
+            'unit': f.unit,
+            'calories': f.calories,
+          }).toList(),
+    };
+  }
+
+  Meal _mealFromJson(Map<String, dynamic> json) {
+    final foodsList = (json['foods'] as List<dynamic>?) ?? [];
+    final foods = foodsList.map((f) {
+      final map = f as Map<String, dynamic>;
+      return FoodItem(
+        name: map['name'] as String,
+        quantity: (map['quantity'] as num).toDouble(),
+        unit: map['unit'] as String? ?? 'g',
+        calories: (map['calories'] as num?)?.toDouble(),
+      );
+    }).toList();
+
+    return Meal(
+      id: json['id'] as String,
+      type: MealType.values.firstWhere(
+        (t) => t.name == json['type'],
+        orElse: () => MealType.lunch,
+      ),
+      dateTime: DateTime.parse(json['dateTime'] as String),
+      foods: foods,
+      notes: json['notes'] as String?,
+      photoPath: json['photoPath'] as String?,
     );
   }
 }

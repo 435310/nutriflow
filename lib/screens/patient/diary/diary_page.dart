@@ -4,12 +4,10 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../widgets/daily_total_card.dart';
 import '../../../widgets/meal_card.dart';
 
-/// ============================================
-/// TELA: DIÁRIO ALIMENTAR
-/// ============================================
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
 
@@ -22,26 +20,24 @@ class _DiaryPageState extends State<DiaryPage>
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
-  // Refeições de exemplo (mock)
-  late List<Meal> _meals;
+  final _storage = LocalStorageService();
+  
+  // Garante que _meals NUNCA será null
+  List<Meal> _meals = []; 
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-
     _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
-
     _controller.forward();
-
-    // Mock de refeições
-    _meals = _buildMockMeals();
+    _loadMeals();
   }
 
   @override
@@ -50,61 +46,44 @@ class _DiaryPageState extends State<DiaryPage>
     super.dispose();
   }
 
-  // ============================================
-  // MOCK DE REFEIÇÕES
-  // ============================================
-  List<Meal> _buildMockMeals() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-
-    return [
-      Meal(
-        id: '1',
-        type: MealType.breakfast,
-        dateTime: today.add(const Duration(hours: 7, minutes: 30)),
-        foods: const [
-          FoodItem(name: 'Pão integral', quantity: 2, unit: 'fatias'),
-          FoodItem(name: 'Ovo mexido', quantity: 2, unit: 'unidades'),
-          FoodItem(name: 'Café com leite', quantity: 200, unit: 'ml'),
-        ],
-      ),
-      Meal(
-        id: '2',
-        type: MealType.lunch,
-        dateTime: today.add(const Duration(hours: 12, minutes: 30)),
-        foods: const [
-          FoodItem(name: 'Frango grelhado', quantity: 150, unit: 'g'),
-          FoodItem(name: 'Arroz integral', quantity: 100, unit: 'g'),
-          FoodItem(name: 'Salada verde', quantity: 1, unit: 'prato'),
-          FoodItem(name: 'Azeite', quantity: 1, unit: 'colher'),
-        ],
-        notes: 'Almoço em casa',
-      ),
-    ];
+  Future<void> _loadMeals() async {
+    try {
+      // Carrega refeições do dia atual
+      final meals = await _storage.loadMealsByDate(DateTime.now());
+      
+      if (!mounted) return;
+      setState(() {
+        // Se por algum motivo 'meals' vier nulo, força uma lista vazia
+        _meals = meals ?? [];
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Erro ao carregar refeições: $e');
+      if (!mounted) return;
+      setState(() {
+        _meals = [];
+        _isLoading = false;
+      });
+    }
   }
 
-  // ============================================
-  // REMOVER REFEIÇÃO
-  // ============================================
   void _handleDelete(Meal meal) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Excluir refeição?'),
-        content: Text(
-          'Deseja realmente excluir "${meal.type.label}"?',
-        ),
+        content: Text('Deseja realmente excluir "${meal.type.label}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _meals.removeWhere((m) => m.id == meal.id);
-              });
+            onPressed: () async {
+              await _storage.deleteMeal(meal.id);
+              if (!mounted) return;
               Navigator.pop(context);
+              _loadMeals();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('${meal.type.label} excluído'),
@@ -122,9 +101,6 @@ class _DiaryPageState extends State<DiaryPage>
     );
   }
 
-  // ============================================
-  // FORMATAR DATA
-  // ============================================
   String _formatDate() {
     final now = DateTime.now();
     const months = [
@@ -134,25 +110,23 @@ class _DiaryPageState extends State<DiaryPage>
     return 'Hoje, ${now.day} de ${months[now.month - 1]}';
   }
 
-  // ============================================
-  // CALCULAR TOTAL DE CALORIAS
-  // ============================================
-  double? _getTotalCalories() {
-    double total = 0;
-    bool hasAny = false;
-    for (final meal in _meals) {
-      final cal = meal.estimatedCalories;
-      if (cal != null) {
-        total += cal;
-        hasAny = true;
-      }
-    }
-    return hasAny ? total : null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final totalCalories = _getTotalCalories();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Diário alimentar'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => AppRoutes.back(context),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -171,24 +145,73 @@ class _DiaryPageState extends State<DiaryPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Data
-                Text(
-                  _formatDate(),
-                  style: AppTextStyles.h2,
-                ),
-
+                Text(_formatDate(), style: AppTextStyles.h2),
                 const SizedBox(height: 20),
 
-                // Card de total do dia
-                DailyTotalCard(
-                  mealCount: _meals.length,
-                  totalCalories: totalCalories,
-                  goalCalories: null,
-                ),
+               Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(20),
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      colors: [
+        AppColors.primary,
+        AppColors.primary.withValues(alpha: 0.85),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
+    borderRadius: BorderRadius.circular(20),
+    boxShadow: [
+      BoxShadow(
+        color: AppColors.primary.withValues(alpha: 0.3),
+        blurRadius: 20,
+        offset: const Offset(0, 8),
+      ),
+    ],
+  ),
+  child: Row(
+    children: [
+      Container(
+        height: 48,
+        width: 48,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Icon(
+          Icons.restaurant_menu,
+          color: Colors.white,
+          size: 24,
+        ),
+      ),
+      const SizedBox(width: 16),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Total do dia',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${_meals.length} refeição${_meals.length != 1 ? 'ões' : ''} registrada${_meals.length != 1 ? 's' : ''}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ],
+  ),
+),
 
                 const SizedBox(height: 28),
 
-                // Título da seção
                 Row(
                   children: [
                     Text('Refeições', style: AppTextStyles.h3),
@@ -215,7 +238,6 @@ class _DiaryPageState extends State<DiaryPage>
 
                 const SizedBox(height: 16),
 
-                // Lista de refeições ou estado vazio
                 if (_meals.isEmpty)
                   _buildEmptyState()
                 else
@@ -240,11 +262,11 @@ class _DiaryPageState extends State<DiaryPage>
           ),
         ),
       ),
-
-      // Botão flutuante
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          AppRoutes.go(context, AppRoutes.registerMeal);
+          Navigator.pushNamed(context, AppRoutes.registerMeal).then((_) {
+            _loadMeals();
+          });
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -254,9 +276,6 @@ class _DiaryPageState extends State<DiaryPage>
     );
   }
 
-  // ============================================
-  // ESTADO VAZIO
-  // ============================================
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,

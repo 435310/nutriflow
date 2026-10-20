@@ -4,6 +4,7 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
+import '../../../services/local_storage_service.dart';
 import '../../../widgets/food_item_field.dart';
 import '../../../widgets/meal_type_selector.dart';
 
@@ -18,17 +19,11 @@ class RegisterMealPage extends StatefulWidget {
 }
 
 class _RegisterMealPageState extends State<RegisterMealPage> {
-  // Tipo de refeição selecionado
   MealType? _selectedType;
-
-  // Alimentos adicionados
   final List<FoodItem> _foods = [];
-
-  // Observações
   final _notesController = TextEditingController();
-
-  // Data/hora da refeição
   DateTime _selectedDateTime = DateTime.now();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -37,7 +32,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
   }
 
   // ============================================
-  // ABRIR MODAL PARA ADICIONAR ALIMENTO
+  // MODAL ADICIONAR ALIMENTO
   // ============================================
   Future<void> _addFood() async {
     final result = await showModalBottomSheet<FoodItem>(
@@ -48,19 +43,12 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
     );
 
     if (result != null) {
-      setState(() {
-        _foods.add(result);
-      });
+      setState(() => _foods.add(result));
     }
   }
 
-  // ============================================
-  // REMOVER ALIMENTO
-  // ============================================
   void _removeFood(int index) {
-    setState(() {
-      _foods.removeAt(index);
-    });
+    setState(() => _foods.removeAt(index));
   }
 
   // ============================================
@@ -88,25 +76,19 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
   // ============================================
   // SALVAR REFEIÇÃO
   // ============================================
-  void _handleSave() {
-    // Validações
+  Future<void> _handleSave() async {
     if (_selectedType == null) {
-      _showSnackBar(
-        'Escolha o tipo de refeição',
-        isError: true,
-      );
+      _showSnackBar('Escolha o tipo de refeição', isError: true);
       return;
     }
 
     if (_foods.isEmpty) {
-      _showSnackBar(
-        'Adicione pelo menos um alimento',
-        isError: true,
-      );
+      _showSnackBar('Adicione pelo menos um alimento', isError: true);
       return;
     }
 
-    // Cria a refeição
+    setState(() => _isSaving = true);
+
     final meal = Meal(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       type: _selectedType!,
@@ -117,15 +99,24 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
           : _notesController.text.trim(),
     );
 
-    // Por enquanto, só mostra aviso
-    _showSnackBar(
-      '${meal.type.label} registrado com ${meal.foods.length} alimento(s)',
-    );
+    // ⚠️ SALVA NO STORAGE
+    final success = await LocalStorageService().saveMeal(meal);
 
-    // Volta para o dashboard depois de 1.5s
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) AppRoutes.back(context);
-    });
+    if (!mounted) return;
+
+    setState(() => _isSaving = false);
+
+    if (success) {
+      _showSnackBar(
+        '${meal.type.label} registrado com ${meal.foods.length} alimento(s)',
+      );
+
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) AppRoutes.back(context);
+      });
+    } else {
+      _showSnackBar('Erro ao salvar. Tente novamente.', isError: true);
+    }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -138,9 +129,6 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
     );
   }
 
-  // ============================================
-  // FORMATAR HORÁRIO
-  // ============================================
   String _formatTime(DateTime dt) {
     return '${dt.hour.toString().padLeft(2, '0')}:'
         '${dt.minute.toString().padLeft(2, '0')}';
@@ -162,37 +150,24 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ============================================
-              // TIPO DE REFEIÇÃO
-              // ============================================
+              // TIPO
               const _SectionTitle(
                 icon: Icons.restaurant_menu,
                 title: 'Tipo de refeição',
               ),
-
               const SizedBox(height: 16),
-
               MealTypeSelector(
                 selected: _selectedType,
-                onChanged: (type) {
-                  setState(() {
-                    _selectedType = type;
-                  });
-                },
+                onChanged: (type) => setState(() => _selectedType = type),
               ),
-
               const SizedBox(height: 32),
 
-              // ============================================
               // HORÁRIO
-              // ============================================
               const _SectionTitle(
                 icon: Icons.access_time,
                 title: 'Horário',
               ),
-
               const SizedBox(height: 12),
-
               InkWell(
                 onTap: _pickTime,
                 borderRadius: BorderRadius.circular(14),
@@ -229,12 +204,9 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 32),
 
-              // ============================================
               // ALIMENTOS
-              // ============================================
               Row(
                 children: [
                   const Expanded(
@@ -253,10 +225,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 8),
-
-              // Lista de alimentos
               if (_foods.isEmpty)
                 Container(
                   width: double.infinity,
@@ -264,10 +233,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                   decoration: BoxDecoration(
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.border,
-                      style: BorderStyle.solid,
-                    ),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     children: [
@@ -287,26 +253,19 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                 )
               else
                 ..._foods.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final food = entry.value;
                   return FoodItemField(
-                    food: food,
-                    onRemove: () => _removeFood(index),
+                    food: entry.value,
+                    onRemove: () => _removeFood(entry.key),
                   );
                 }),
-
               const SizedBox(height: 32),
 
-              // ============================================
               // OBSERVAÇÕES
-              // ============================================
               const _SectionTitle(
                 icon: Icons.notes_outlined,
                 title: 'Observações (opcional)',
               ),
-
               const SizedBox(height: 12),
-
               TextField(
                 controller: _notesController,
                 maxLines: 3,
@@ -315,25 +274,28 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                   hintText: 'Como você se sentiu? Alguma observação?',
                 ),
               ),
-
               const SizedBox(height: 32),
 
-              // ============================================
               // BOTÕES
-              // ============================================
               ElevatedButton.icon(
-                onPressed: _handleSave,
-                icon: const Icon(Icons.check),
-                label: const Text('Salvar refeição'),
+                onPressed: _isSaving ? null : _handleSave,
+                icon: _isSaving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.check),
+                label: Text(_isSaving ? 'Salvando...' : 'Salvar refeição'),
               ),
-
               const SizedBox(height: 12),
-
               OutlinedButton(
-                onPressed: () => AppRoutes.back(context),
+                onPressed: _isSaving ? null : () => AppRoutes.back(context),
                 child: const Text('Cancelar'),
               ),
-
               const SizedBox(height: 24),
             ],
           ),
@@ -455,7 +417,6 @@ class _AddFoodModalState extends State<_AddFoodModal> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Alça de arrastar
           Center(
             child: Container(
               width: 40,
@@ -466,14 +427,9 @@ class _AddFoodModalState extends State<_AddFoodModal> {
               ),
             ),
           ),
-
           const SizedBox(height: 20),
-
           Text('Adicionar alimento', style: AppTextStyles.h2),
-
           const SizedBox(height: 24),
-
-          // Nome
           TextField(
             controller: _nameController,
             autofocus: true,
@@ -484,19 +440,15 @@ class _AddFoodModalState extends State<_AddFoodModal> {
               prefixIcon: Icon(Icons.restaurant),
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Quantidade + Unidade
           Row(
             children: [
               Expanded(
                 flex: 2,
                 child: TextField(
                   controller: _quantityController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
                     labelText: 'Quantidade',
                     prefixIcon: Icon(Icons.numbers),
@@ -508,9 +460,7 @@ class _AddFoodModalState extends State<_AddFoodModal> {
                 flex: 2,
                 child: DropdownButtonFormField<String>(
                   value: _selectedUnit,
-                  decoration: const InputDecoration(
-                    labelText: 'Unidade',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Unidade'),
                   items: _units.map((unit) {
                     return DropdownMenuItem<String>(
                       value: unit,
@@ -519,19 +469,14 @@ class _AddFoodModalState extends State<_AddFoodModal> {
                   }).toList(),
                   onChanged: (value) {
                     if (value != null) {
-                      setState(() {
-                        _selectedUnit = value;
-                      });
+                      setState(() => _selectedUnit = value);
                     }
                   },
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 24),
-
-          // Botões
           Row(
             children: [
               Expanded(
