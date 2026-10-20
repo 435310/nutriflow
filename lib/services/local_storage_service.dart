@@ -6,6 +6,7 @@ import '../models/meal.dart';
 import '../models/patient_profile.dart';
 import '../models/symptom_report.dart';
 import '../models/weight_entry.dart';
+import '../models/chat_message.dart';
 
 /// ============================================
 /// SERVIÇO DE ARMAZENAMENTO LOCAL
@@ -16,6 +17,7 @@ class LocalStorageService {
   static const String _keyOnboarded = 'is_onboarded';
   static const String _keyMeals = 'meal_entries';
   static const String _keySymptoms = 'symptom_reports';
+  static const String _keyChat = 'chat_messages';
 
   static final LocalStorageService _instance =
       LocalStorageService._internal();
@@ -223,6 +225,43 @@ class LocalStorageService {
     return await prefs.setString(_keySymptoms, jsonEncode(list));
   }
 
+    // ============================================
+  // CHAT
+  // ============================================
+  Future<bool> saveChatMessage(ChatMessage message) async {
+    try {
+      final messages = await loadChatMessages();
+      messages.add(message);
+      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return await _saveAllChatMessages(messages);
+    } catch (e) {
+      print('Erro ao salvar mensagem: $e');
+      return false;
+    }
+  }
+
+  Future<List<ChatMessage>> loadChatMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_keyChat);
+      if (jsonString == null) return <ChatMessage>[];
+
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      return list
+          .map((item) => _chatMessageFromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Erro ao carregar mensagens: $e');
+      return <ChatMessage>[];
+    }
+  }
+
+  Future<bool> _saveAllChatMessages(List<ChatMessage> messages) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = messages.map((m) => _chatMessageToJson(m)).toList();
+    return await prefs.setString(_keyChat, jsonEncode(list));
+  }
+
   // ============================================
   // ONBOARDING
   // ============================================
@@ -394,3 +433,25 @@ class LocalStorageService {
     );
   }
 }
+  // ============================================
+  // JSON — CHAT
+  // ============================================
+  Map<String, dynamic> _chatMessageToJson(ChatMessage m) {
+    return {
+      'id': m.id,
+      'text': m.text,
+      'timestamp': m.timestamp.toIso8601String(),
+      'isFromPatient': m.isFromPatient,
+      'isRead': m.isRead,
+    };
+  }
+
+  ChatMessage _chatMessageFromJson(Map<String, dynamic> json) {
+    return ChatMessage(
+      id: json['id'] as String,
+      text: json['text'] as String,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+      isFromPatient: json['isFromPatient'] as bool,
+      isRead: json['isRead'] as bool? ?? true,
+    );
+  }

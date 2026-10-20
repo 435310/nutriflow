@@ -60,9 +60,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     super.dispose();
   }
 
-  // ============================================
-  // CARREGAR DADOS DO STORAGE
-  // ============================================
   Future<void> _loadData() async {
     try {
       final profile = await _storage.loadProfile();
@@ -100,7 +97,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       await Navigator.pushNamed(context, AppRoutes.profile);
     }
 
-    // Recarrega os dados quando volta para o Dashboard
     if (mounted) _loadData();
   }
 
@@ -166,7 +162,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ⚠️ NOVO CARD DE SINTOMAS
                 SymptomCard(
                   latestReport: _latestSymptom,
                   onTap: () async {
@@ -184,6 +179,72 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                       'Frango grelhado, arroz integral, salada verde e azeite',
                   icon: Icons.lunch_dining_outlined,
                   color: AppColors.secondary,
+                ),
+
+                const SizedBox(height: 16),
+
+                // ============================================
+                // ATALHO PARA O CHAT
+                // ============================================
+                InkWell(
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.patientChat);
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 40,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.chat_bubble_outline,
+                            color: AppColors.secondary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Falar com a Nutricionista',
+                                style: AppTextStyles.h3.copyWith(fontSize: 16),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tire dúvidas sobre o seu plano',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -214,9 +275,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   }
 }
 
-// ============================================
-// WIDGET: SEÇÃO DE DICAS
-// ============================================
 class _TipsSection extends StatelessWidget {
   const _TipsSection();
 

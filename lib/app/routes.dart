@@ -16,6 +16,7 @@ import '../screens/patient/symptoms/report_symptoms_page.dart';
 import '../screens/nutritionist/dashboard/nutritionist_dashboard_page.dart';
 import '../screens/nutritionist/patients/patients_page.dart';
 import '../screens/nutritionist/patients/patient_detail_page.dart';
+import '../screens/chat/chat_page.dart'; // NOVO
 import '../screens/test/avatar_test_page.dart';
 
 class AppRoutes {
@@ -37,6 +38,10 @@ class AppRoutes {
   static const String nutritionistDashboard = '/nutritionist-dashboard';
   static const String nutritionistPatients = '/nutritionist-patients';
   static const String nutritionistPatientDetail = '/nutritionist-patient-detail';
+  
+  // NOVAS ROTAS DE CHAT
+  static const String patientChat = '/patient-chat';
+  static const String nutritionistChat = '/nutritionist-chat';
 
   static Map<String, WidgetBuilder> get routes {
     return {
@@ -56,6 +61,9 @@ class AppRoutes {
       nutritionistDashboard: (_) => const NutritionistDashboardPage(),
       nutritionistPatients: (_) => const PatientsPage(),
       nutritionistPatientDetail: (_) => const PatientDetailPage(),
+      // NOVAS ROTAS DE CHAT
+      patientChat: (_) => const ChatPage(isNutritionist: false, otherPartyName: 'Dra. Ana'),
+      nutritionistChat: (_) => const ChatPage(isNutritionist: true, otherPartyName: 'Maria Silva'),
       '/avatar-test': (_) => const AvatarTestPage(),
     };
   }

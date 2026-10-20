@@ -108,6 +108,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
                 _buildHeader(profile),
                 const SizedBox(height: 28),
 
+                // Resumo
                 PatientDetailSection(
                   icon: Icons.insights_outlined,
                   title: 'Resumo',
@@ -148,6 +149,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
+                // Evolução de peso
                 PatientDetailSection(
                   icon: Icons.show_chart,
                   title: 'Evolução de peso',
@@ -185,9 +187,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
-                // ============================================
-                // SINTOMAS E DIFICULDADES
-                // ============================================
+                // Sintomas e dificuldades
                 PatientDetailSection(
                   icon: Icons.psychology_outlined,
                   title: 'Sintomas e dificuldades',
@@ -213,6 +213,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
+                // Últimas refeições
                 PatientDetailSection(
                   icon: Icons.restaurant_menu,
                   title: 'Últimas refeições',
@@ -235,6 +236,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
+                // Últimos exames
                 PatientDetailSection(
                   icon: Icons.description_outlined,
                   title: 'Últimos exames',
@@ -257,6 +259,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 16),
 
+                // Últimas mensagens
                 PatientDetailSection(
                   icon: Icons.chat_bubble_outline,
                   title: 'Últimas mensagens',
@@ -279,8 +282,13 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
                 const SizedBox(height: 24),
 
+                // ============================================
+                // BOTÃO DE CHAT (CORRIGIDO)
+                // ============================================
                 ElevatedButton.icon(
-                  onPressed: () => _showComingSoon('Enviar mensagem'),
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.nutritionistChat);
+                  },
                   icon: const Icon(Icons.chat_bubble_outline),
                   label: const Text('Enviar mensagem'),
                 ),
@@ -507,9 +515,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     );
   }
 
-  // ============================================
-  // LINHA DE SINTOMAS
-  // ============================================
   Widget _buildSymptomRow(SymptomReport report) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
