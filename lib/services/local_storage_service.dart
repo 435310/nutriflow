@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/meal.dart';
 import '../models/patient_profile.dart';
+import '../models/symptom_report.dart';
 import '../models/weight_entry.dart';
 
 /// ============================================
@@ -14,6 +15,7 @@ class LocalStorageService {
   static const String _keyWeights = 'weight_entries';
   static const String _keyOnboarded = 'is_onboarded';
   static const String _keyMeals = 'meal_entries';
+  static const String _keySymptoms = 'symptom_reports';
 
   static final LocalStorageService _instance =
       LocalStorageService._internal();
@@ -168,6 +170,60 @@ class LocalStorageService {
   }
 
   // ============================================
+  // SINTOMAS E DIFICULDADES
+  // ============================================
+  Future<bool> saveSymptomReport(SymptomReport report) async {
+    try {
+      final reports = await loadSymptomReports();
+      reports.add(report);
+      reports.sort((a, b) => b.date.compareTo(a.date));
+      return await _saveAllSymptomReports(reports);
+    } catch (e) {
+      print('Erro ao salvar relato: $e');
+      return false;
+    }
+  }
+
+  Future<List<SymptomReport>> loadSymptomReports() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_keySymptoms);
+      if (jsonString == null) return <SymptomReport>[];
+
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      return list
+          .map((item) => _symptomFromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Erro ao carregar relatos: $e');
+      return <SymptomReport>[];
+    }
+  }
+
+  Future<SymptomReport?> loadLatestSymptomReport() async {
+    final reports = await loadSymptomReports();
+    if (reports.isEmpty) return null;
+    return reports.first;
+  }
+
+  Future<bool> deleteSymptomReport(String id) async {
+    try {
+      final reports = await loadSymptomReports();
+      reports.removeWhere((r) => r.id == id);
+      return await _saveAllSymptomReports(reports);
+    } catch (e) {
+      print('Erro ao deletar relato: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _saveAllSymptomReports(List<SymptomReport> reports) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = reports.map((r) => _symptomToJson(r)).toList();
+    return await prefs.setString(_keySymptoms, jsonEncode(list));
+  }
+
+  // ============================================
   // ONBOARDING
   // ============================================
   Future<bool> isOnboarded() async {
@@ -311,6 +367,30 @@ class LocalStorageService {
       foods: foods,
       notes: json['notes'] as String?,
       photoPath: json['photoPath'] as String?,
+    );
+  }
+
+  // ============================================
+  // CONVERSÃO PARA JSON — SINTOMAS
+  // ============================================
+  Map<String, dynamic> _symptomToJson(SymptomReport report) {
+    return {
+      'id': report.id,
+      'date': report.date.toIso8601String(),
+      'symptoms': report.symptoms,
+      'difficulties': report.difficulties,
+      'notes': report.notes,
+    };
+  }
+
+  SymptomReport _symptomFromJson(Map<String, dynamic> json) {
+    return SymptomReport(
+      id: json['id'] as String,
+      date: DateTime.parse(json['date'] as String),
+      symptoms: (json['symptoms'] as List<dynamic>?)?.cast<String>() ?? [],
+      difficulties:
+          (json['difficulties'] as List<dynamic>?)?.cast<String>() ?? [],
+      notes: json['notes'] as String?,
     );
   }
 }

@@ -4,12 +4,14 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
+import '../../../models/symptom_report.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../widgets/evolution_card.dart';
 import '../../../widgets/greeting_header.dart';
 import '../../../widgets/meals_today_card.dart';
 import '../../../widgets/next_meal_card.dart';
 import '../../../widgets/patient_bottom_nav.dart';
+import '../../../widgets/symptom_card.dart';
 
 /// ============================================
 /// TELA: DASHBOARD DO PACIENTE
@@ -29,8 +31,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   int _currentNavIndex = 0;
 
   final _storage = LocalStorageService();
+  
   PatientProfile? _profile;
   int _mealsTodayCount = 0;
+  SymptomReport? _latestSymptom;
   bool _isLoading = true;
 
   @override
@@ -57,21 +61,20 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   }
 
   // ============================================
-  // CARREGAR PERFIL E REFEIÇÕES
+  // CARREGAR DADOS DO STORAGE
   // ============================================
   Future<void> _loadData() async {
     try {
-      // Carrega perfil
       final profile = await _storage.loadProfile();
-      
-      // Carrega refeições de hoje
       final mealsToday = await _storage.loadMealsByDate(DateTime.now());
+      final latestSymptom = await _storage.loadLatestSymptomReport();
       
       if (!mounted) return;
 
       setState(() {
         _profile = profile ?? PatientProfile.mock();
         _mealsTodayCount = mealsToday.length;
+        _latestSymptom = latestSymptom;
         _isLoading = false;
       });
     } catch (e) {
@@ -97,7 +100,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       await Navigator.pushNamed(context, AppRoutes.profile);
     }
 
-    // Recarrega quando volta
+    // Recarrega os dados quando volta para o Dashboard
     if (mounted) _loadData();
   }
 
@@ -152,12 +155,22 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ⚠️ AGORA USA O CONTADOR REAL
                 MealsTodayCard(
                   registered: _mealsTodayCount,
                   total: 5,
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.diary);
+                    if (mounted) _loadData();
+                  },
+                ),
+
+                const SizedBox(height: 16),
+
+                // ⚠️ NOVO CARD DE SINTOMAS
+                SymptomCard(
+                  latestReport: _latestSymptom,
+                  onTap: () async {
+                    await Navigator.pushNamed(context, AppRoutes.reportSymptoms);
                     if (mounted) _loadData();
                   },
                 ),
