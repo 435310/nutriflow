@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../app/routes.dart';
-import '../../core/constants/app_strings.dart';
-import '../../core/theme/colors.dart';
-import '../../core/theme/text_styles.dart';
+import '../../../app/routes.dart';
+import '../../../core/constants/app_strings.dart';
+import '../../../core/theme/colors.dart';
+import '../../../core/theme/text_styles.dart';
+import '../../../services/auth_service.dart';
 
 /// ============================================
-/// TELA: CADASTRO (com animações)
+/// TELA: CADASTRO (com animações e Supabase)
 /// ============================================
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -17,19 +18,17 @@ class SignupPage extends StatefulWidget {
 
 class _SignupPageState extends State<SignupPage>
     with SingleTickerProviderStateMixin {
-  // Chave do formulário
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  // Estados
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptedTerms = false;
+  bool _isSaving = false;
 
   // Animações
   late AnimationController _controller;
@@ -59,139 +58,61 @@ class _SignupPageState extends State<SignupPage>
       duration: const Duration(milliseconds: 1600),
     );
 
-    // Título
     _titleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.3, curve: Curves.easeOut)),
     );
-    _titleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOutCubic),
-      ),
+    _titleSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.3, curve: Curves.easeOutCubic)),
     );
 
-    // Subtítulo
     _subtitleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.08, 0.35, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.08, 0.35, curve: Curves.easeOut)),
     );
-    _subtitleSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.08, 0.35, curve: Curves.easeOutCubic),
-      ),
+    _subtitleSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.08, 0.35, curve: Curves.easeOutCubic)),
     );
 
-    // Campo Nome
     _nameFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.2, 0.45, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.2, 0.45, curve: Curves.easeOut)),
     );
-    _nameSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.2, 0.45, curve: Curves.easeOutCubic),
-      ),
+    _nameSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.2, 0.45, curve: Curves.easeOutCubic)),
     );
 
-    // Campo E-mail
     _emailFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.32, 0.57, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.32, 0.57, curve: Curves.easeOut)),
     );
-    _emailSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.32, 0.57, curve: Curves.easeOutCubic),
-      ),
+    _emailSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.32, 0.57, curve: Curves.easeOutCubic)),
     );
 
-    // Campo Senha
     _passwordFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.44, 0.69, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.44, 0.69, curve: Curves.easeOut)),
     );
-    _passwordSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.44, 0.69, curve: Curves.easeOutCubic),
-      ),
+    _passwordSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.44, 0.69, curve: Curves.easeOutCubic)),
     );
 
-    // Campo Confirmar Senha
     _confirmFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.56, 0.81, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.56, 0.81, curve: Curves.easeOut)),
     );
-    _confirmSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.56, 0.81, curve: Curves.easeOutCubic),
-      ),
+    _confirmSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.56, 0.81, curve: Curves.easeOutCubic)),
     );
 
-    // Checkbox de Termos
     _termsFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.7, 0.88, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.7, 0.88, curve: Curves.easeOut)),
     );
 
-    // Botão Criar conta
     _buttonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.78, 0.94, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.78, 0.94, curve: Curves.easeOut)),
     );
-    _buttonSlide = Tween<Offset>(
-      begin: const Offset(0, 0.4),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.78, 0.94, curve: Curves.easeOutCubic),
-      ),
+    _buttonSlide = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.78, 0.94, curve: Curves.easeOutCubic)),
     );
 
-    // Rodapé (Já tem conta)
     _footerFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.88, 1.0, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.88, 1.0, curve: Curves.easeOut)),
     );
 
     _controller.forward();
@@ -207,50 +128,38 @@ class _SignupPageState extends State<SignupPage>
     super.dispose();
   }
 
-  // Validações
+  // ============================================
+  // VALIDAÇÕES
+  // ============================================
   String? _validateName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return AppStrings.validationNameRequired;
-    }
-    if (value.trim().length < 3) {
-      return AppStrings.validationNameShort;
-    }
+    if (value == null || value.trim().isEmpty) return AppStrings.validationNameRequired;
+    if (value.trim().length < 3) return AppStrings.validationNameShort;
     return null;
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return AppStrings.validationEmailRequired;
-    }
+    if (value == null || value.trim().isEmpty) return AppStrings.validationEmailRequired;
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value.trim())) {
-      return AppStrings.validationEmailInvalid;
-    }
+    if (!emailRegex.hasMatch(value.trim())) return AppStrings.validationEmailInvalid;
     return null;
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.validationPasswordRequired;
-    }
-    if (value.length < 6) {
-      return AppStrings.validationPasswordShort;
-    }
+    if (value == null || value.isEmpty) return AppStrings.validationPasswordRequired;
+    if (value.length < 6) return AppStrings.validationPasswordShort;
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.validationConfirmPasswordRequired;
-    }
-    if (value != _passwordController.text) {
-      return AppStrings.validationPasswordMismatch;
-    }
+    if (value == null || value.isEmpty) return AppStrings.validationConfirmPasswordRequired;
+    if (value != _passwordController.text) return AppStrings.validationPasswordMismatch;
     return null;
   }
 
-  // Ação do botão Criar conta
-  void _handleSignup() {
+  // ============================================
+  // CADASTRAR NO SUPABASE
+  // ============================================
+  Future<void> _handleSignup() async {
     final isFormValid = _formKey.currentState!.validate();
 
     if (!_acceptedTerms) {
@@ -264,16 +173,49 @@ class _SignupPageState extends State<SignupPage>
       return;
     }
 
-    if (isFormValid) {
+    if (!isFormValid) return;
+
+    setState(() => _isSaving = true);
+
+    final authService = AuthService();
+    
+    // Nota: Como não temos a escolha de perfil na tela, vamos cadastrar como paciente por padrão.
+    final error = await authService.signUp(
+      name: _nameController.text,
+      email: _emailController.text,
+      password: _passwordController.text,
+      isNutritionist: false,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    if (error == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conta criada com sucesso!'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) AppRoutes.go(context, AppRoutes.patientDashboard);
+      });
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Cadastro: ${_nameController.text.trim()}'),
-          duration: const Duration(seconds: 2),
+          content: Text(error),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
   }
 
+  // ============================================
+  // BUILD
+  // ============================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -291,211 +233,34 @@ class _SignupPageState extends State<SignupPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 20),
-
-                // Título
-                FadeTransition(
-                  opacity: _titleFade,
-                  child: SlideTransition(
-                    position: _titleSlide,
-                    child: const Text(
-                      AppStrings.signupTitle,
-                      style: AppTextStyles.h1,
-                    ),
-                  ),
-                ),
-
+                FadeTransition(opacity: _titleFade, child: SlideTransition(position: _titleSlide, child: const Text(AppStrings.signupTitle, style: AppTextStyles.h1))),
                 const SizedBox(height: 12),
-
-                // Subtítulo
-                FadeTransition(
-                  opacity: _subtitleFade,
-                  child: SlideTransition(
-                    position: _subtitleSlide,
-                    child: const Text(
-                      AppStrings.signupSubtitle,
-                      style: AppTextStyles.bodySecondary,
-                    ),
-                  ),
-                ),
-
+                FadeTransition(opacity: _subtitleFade, child: SlideTransition(position: _subtitleSlide, child: const Text(AppStrings.signupSubtitle, style: AppTextStyles.bodySecondary))),
                 const SizedBox(height: 40),
-
-                // Campo Nome
-                FadeTransition(
-                  opacity: _nameFade,
-                  child: SlideTransition(
-                    position: _nameSlide,
-                    child: TextFormField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      validator: _validateName,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.signupNameLabel,
-                        hintText: AppStrings.signupNameHint,
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                    ),
-                  ),
-                ),
-
+                
+                FadeTransition(opacity: _nameFade, child: SlideTransition(position: _nameSlide, child: TextFormField(controller: _nameController, textCapitalization: TextCapitalization.words, validator: _validateName, decoration: const InputDecoration(labelText: AppStrings.signupNameLabel, prefixIcon: Icon(Icons.person_outline))))),
                 const SizedBox(height: 20),
-
-                // Campo E-mail
-                FadeTransition(
-                  opacity: _emailFade,
-                  child: SlideTransition(
-                    position: _emailSlide,
-                    child: TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      validator: _validateEmail,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.signupEmailLabel,
-                        hintText: AppStrings.signupEmailHint,
-                        prefixIcon: Icon(Icons.email_outlined),
-                      ),
-                    ),
-                  ),
-                ),
-
+                
+                FadeTransition(opacity: _emailFade, child: SlideTransition(position: _emailSlide, child: TextFormField(controller: _emailController, keyboardType: TextInputType.emailAddress, validator: _validateEmail, decoration: const InputDecoration(labelText: AppStrings.signupEmailLabel, prefixIcon: Icon(Icons.email_outlined))))),
                 const SizedBox(height: 20),
-
-                // Campo Senha
-                FadeTransition(
-                  opacity: _passwordFade,
-                  child: SlideTransition(
-                    position: _passwordSlide,
-                    child: TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.next,
-                      validator: _validatePassword,
-                      decoration: InputDecoration(
-                        labelText: AppStrings.signupPasswordLabel,
-                        hintText: AppStrings.signupPasswordHint,
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
+                
+                FadeTransition(opacity: _passwordFade, child: SlideTransition(position: _passwordSlide, child: TextFormField(controller: _passwordController, obscureText: _obscurePassword, validator: _validatePassword, decoration: InputDecoration(labelText: AppStrings.signupPasswordLabel, prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => _obscurePassword = !_obscurePassword)))))),
                 const SizedBox(height: 20),
-
-                // Campo Confirmar Senha
-                FadeTransition(
-                  opacity: _confirmFade,
-                  child: SlideTransition(
-                    position: _confirmSlide,
-                    child: TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword,
-                      textInputAction: TextInputAction.done,
-                      validator: _validateConfirmPassword,
-                      onFieldSubmitted: (_) => _handleSignup(),
-                      decoration: InputDecoration(
-                        labelText: AppStrings.signupConfirmPasswordLabel,
-                        hintText: AppStrings.signupConfirmPasswordHint,
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword =
-                                  !_obscureConfirmPassword;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
+                
+                FadeTransition(opacity: _confirmFade, child: SlideTransition(position: _confirmSlide, child: TextFormField(controller: _confirmPasswordController, obscureText: _obscureConfirmPassword, validator: _validateConfirmPassword, decoration: InputDecoration(labelText: AppStrings.signupConfirmPasswordLabel, prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(icon: Icon(_obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword)))))),
                 const SizedBox(height: 24),
-
-                // Checkbox de Termos
-                FadeTransition(
-                  opacity: _termsFade,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Checkbox(
-                        value: _acceptedTerms,
-                        activeColor: AppColors.primary,
-                        onChanged: (value) {
-                          setState(() {
-                            _acceptedTerms = value ?? false;
-                          });
-                        },
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Text(
-                            AppStrings.signupTermsText,
-                            style: AppTextStyles.caption.copyWith(height: 1.4),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
+                
+                FadeTransition(opacity: _termsFade, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Checkbox(value: _acceptedTerms, activeColor: AppColors.primary, onChanged: (v) => setState(() => _acceptedTerms = v ?? false)), Expanded(child: Padding(padding: const EdgeInsets.only(top: 12), child: Text(AppStrings.signupTermsText, style: AppTextStyles.caption.copyWith(height: 1.4))))])),
                 const SizedBox(height: 24),
-
-                // Botão Criar conta
-                FadeTransition(
-                  opacity: _buttonFade,
-                  child: SlideTransition(
-                    position: _buttonSlide,
-                    child: ElevatedButton(
-                      onPressed: _handleSignup,
-                      child: const Text(AppStrings.signupButton),
-                    ),
-                  ),
-                ),
-
+                
+                FadeTransition(opacity: _buttonFade, child: SlideTransition(position: _buttonSlide, child: ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _handleSignup,
+                  icon: _isSaving ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.check),
+                  label: Text(_isSaving ? 'Criando conta...' : AppStrings.signupButton),
+                ))),
                 const SizedBox(height: 24),
-
-                // Rodapé - Já tem conta
-                FadeTransition(
-                  opacity: _footerFade,
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          AppStrings.signupAlreadyHaveAccount,
-                          style: AppTextStyles.caption,
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            AppRoutes.go(context, AppRoutes.login);
-                          },
-                          child: const Text(AppStrings.signupLogin),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                
+                FadeTransition(opacity: _footerFade, child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [const Text(AppStrings.signupAlreadyHaveAccount, style: AppTextStyles.caption), TextButton(onPressed: () => AppRoutes.go(context, AppRoutes.login), child: const Text(AppStrings.signupLogin))]))),
               ],
             ),
           ),
