@@ -4,12 +4,12 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
-import '../../../services/local_storage_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/food_item_field.dart';
 import '../../../widgets/meal_type_selector.dart';
 
 /// ============================================
-/// TELA: REGISTRAR REFEIÇÃO
+/// TELA: REGISTRAR REFEIÇÃO (Integrada ao Supabase)
 /// ============================================
 class RegisterMealPage extends StatefulWidget {
   const RegisterMealPage({super.key});
@@ -74,7 +74,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
   }
 
   // ============================================
-  // SALVAR REFEIÇÃO
+  // SALVAR NO SUPABASE
   // ============================================
   Future<void> _handleSave() async {
     if (_selectedType == null) {
@@ -99,23 +99,21 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
           : _notesController.text.trim(),
     );
 
-    // ⚠️ SALVA NO STORAGE
-    final success = await LocalStorageService().saveMeal(meal);
+    // Salva no Supabase
+    final authService = AuthService();
+    final error = await authService.saveMealToCloud(meal);
 
     if (!mounted) return;
 
     setState(() => _isSaving = false);
 
-    if (success) {
-      _showSnackBar(
-        '${meal.type.label} registrado com ${meal.foods.length} alimento(s)',
-      );
-
+    if (error == null) {
+      _showSnackBar('${meal.type.label} salvo com sucesso!');
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (mounted) AppRoutes.back(context);
       });
     } else {
-      _showSnackBar('Erro ao salvar. Tente novamente.', isError: true);
+      _showSnackBar(error, isError: true);
     }
   }
 
@@ -150,7 +148,6 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // TIPO
               const _SectionTitle(
                 icon: Icons.restaurant_menu,
                 title: 'Tipo de refeição',
@@ -162,7 +159,6 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
               ),
               const SizedBox(height: 32),
 
-              // HORÁRIO
               const _SectionTitle(
                 icon: Icons.access_time,
                 title: 'Horário',
@@ -206,7 +202,6 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
               ),
               const SizedBox(height: 32),
 
-              // ALIMENTOS
               Row(
                 children: [
                   const Expanded(
@@ -260,7 +255,6 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                 }),
               const SizedBox(height: 32),
 
-              // OBSERVAÇÕES
               const _SectionTitle(
                 icon: Icons.notes_outlined,
                 title: 'Observações (opcional)',
@@ -276,7 +270,6 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
               ),
               const SizedBox(height: 32),
 
-              // BOTÕES
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : _handleSave,
                 icon: _isSaving

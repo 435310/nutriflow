@@ -4,11 +4,12 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
-import '../../../services/local_storage_service.dart';
-import '../../../widgets/daily_total_card.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/meal_card.dart';
 
-
+/// ============================================
+/// TELA: DIÁRIO ALIMENTAR (Integrado ao Supabase)
+/// ============================================
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
 
@@ -21,22 +22,23 @@ class _DiaryPageState extends State<DiaryPage>
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
-  final _storage = LocalStorageService();
-  
-  // Garante que _meals NUNCA será null
-  List<Meal> _meals = []; 
+  final _authService = AuthService();
+  List<Meal> _meals = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+
     _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
+
     _controller.forward();
     _loadMeals();
   }
@@ -47,15 +49,18 @@ class _DiaryPageState extends State<DiaryPage>
     super.dispose();
   }
 
+  // ============================================
+  // CARREGAR REFEIÇÕES DO SUPABASE
+  // ============================================
   Future<void> _loadMeals() async {
     try {
-      // Carrega refeições do dia atual
-      final meals = await _storage.loadMealsByDate(DateTime.now());
+      // Busca as refeições de hoje direto da nuvem
+      final meals = await _authService.getMealsFromCloud(date: DateTime.now());
       
       if (!mounted) return;
+      
       setState(() {
-        // Se por algum motivo 'meals' vier nulo, força uma lista vazia
-        _meals = meals ?? [];
+        _meals = meals;
         _isLoading = false;
       });
     } catch (e) {
@@ -68,6 +73,9 @@ class _DiaryPageState extends State<DiaryPage>
     }
   }
 
+  // ============================================
+  // REMOVER REFEIÇÃO (Ainda não implementado no Supabase)
+  // ============================================
   void _handleDelete(Meal meal) {
     showDialog(
       context: context,
@@ -81,14 +89,13 @@ class _DiaryPageState extends State<DiaryPage>
           ),
           TextButton(
             onPressed: () async {
-              await _storage.deleteMeal(meal.id);
-              if (!mounted) return;
+              // TODO: Implementar delete no Supabase
               Navigator.pop(context);
-              _loadMeals();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${meal.type.label} excluído'),
-                  duration: const Duration(seconds: 2),
+                const SnackBar(
+                  content: Text('Exclusão em breve (precisa de permissão no banco)'),
+                  backgroundColor: AppColors.warning,
+                  duration: Duration(seconds: 2),
                 ),
               );
             },
@@ -149,67 +156,68 @@ class _DiaryPageState extends State<DiaryPage>
                 Text(_formatDate(), style: AppTextStyles.h2),
                 const SizedBox(height: 20),
 
-               Container(
-  width: double.infinity,
-  padding: const EdgeInsets.all(20),
-  decoration: BoxDecoration(
-    gradient: LinearGradient(
-      colors: [
-        AppColors.primary,
-        AppColors.primary.withValues(alpha: 0.85),
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    ),
-    borderRadius: BorderRadius.circular(20),
-    boxShadow: [
-      BoxShadow(
-        color: AppColors.primary.withValues(alpha: 0.3),
-        blurRadius: 20,
-        offset: const Offset(0, 8),
-      ),
-    ],
-  ),
-  child: Row(
-    children: [
-      Container(
-        height: 48,
-        width: 48,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Icon(
-          Icons.restaurant_menu,
-          color: Colors.white,
-          size: 24,
-        ),
-      ),
-      const SizedBox(width: 16),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Total do dia',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${_meals.length} refeição${_meals.length != 1 ? 'ões' : ''} registrada${_meals.length != 1 ? 's' : ''}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    ],
-  ),
-),
+                // Card total do dia (simplificado)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withValues(alpha: 0.85),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 48,
+                        width: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.restaurant_menu,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Total do dia',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_meals.length} refeição${_meals.length != 1 ? 'ões' : ''} registrada${_meals.length != 1 ? 's' : ''}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
                 const SizedBox(height: 28),
 
@@ -264,10 +272,9 @@ class _DiaryPageState extends State<DiaryPage>
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.pushNamed(context, AppRoutes.registerMeal).then((_) {
-            _loadMeals();
-          });
+        onPressed: () async {
+          await Navigator.pushNamed(context, AppRoutes.registerMeal);
+          _loadMeals(); // Recarrega ao voltar
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

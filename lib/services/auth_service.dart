@@ -1,16 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/meal.dart';
+
 /// ============================================
-/// SERVIÇO DE AUTENTICAÇÃO
+/// SERVIÇO DE AUTENTICAÇÃO E DADOS NA NUVEM
 /// ============================================
 class AuthService {
-  // Pega a instância do Supabase
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  // Pega o usuário logado no momento
   User? get currentUser => _supabase.auth.currentUser;
-
-  // Retorna verdadeiro se o usuário estiver logado
   bool get isLoggedIn => currentUser != null;
 
   // ============================================
@@ -49,7 +47,7 @@ class AuthService {
         });
       }
 
-      return null; // Sucesso!
+      return null;
     } on AuthException catch (e) {
       return e.message;
     } catch (e) {
@@ -123,6 +121,86 @@ class AuthService {
     } catch (e) {
       print('Erro ao verificar tipo de usuário: $e');
       return false;
+    }
+  }
+
+  // ============================================
+  // REFEIÇÕES
+  // ============================================
+  Future<String?> saveMealToCloud(Meal meal) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      final foodsJson = meal.foods.map((f) => {
+        'name': f.name,
+        'quantity': f.quantity,
+        'unit': f.unit,
+        'calories': f.calories,
+      }).toList();
+
+      await _supabase.from('meal_entries').insert({
+        'patient_id': user.id, // Usa o user.id para o RLS funcionar
+        'type': meal.type.name,
+        'date_time': meal.dateTime.toIso8601String(),
+        'notes': meal.notes,
+        'photo_path': meal.photoPath,
+        'foods': foodsJson,
+      });
+
+      return null;
+    } catch (e) {
+      print('Erro ao salvar refeição no Supabase: $e');
+      return 'Erro ao salvar refeição: $e';
+    }
+  }
+
+  Future<List<Meal>> getMealsFromCloud({DateTime? date}) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return [];
+
+      final targetDate = date ?? DateTime.now();
+      
+      final startOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day).toIso8601String();
+      final endOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day, 23, 59, 59).toIso8601String();
+
+      final response = await _supabase
+          .from('meal_entries')
+          .select()
+          .eq('patient_id', user.id)
+          .gte('date_time', startOfDay)
+          .lte('date_time', endOfDay)
+          .order('date_time', ascending: true);
+
+      final List<Meal> meals = [];
+      
+      for (final row in response) {
+        final foodsList = (row['foods'] as List<dynamic>?) ?? [];
+        final foods = foodsList.map((f) => FoodItem(
+          name: f['name'] as String,
+          quantity: (f['quantity'] as num).toDouble(),
+          unit: f['unit'] as String? ?? 'g',
+          calories: (f['calories'] as num?)?.toDouble(),
+        )).toList();
+
+        meals.add(Meal(
+          id: row['id'] as String,
+          type: MealType.values.firstWhere(
+            (t) => t.name == row['type'],
+            orElse: () => MealType.lunch,
+          ),
+          dateTime: DateTime.parse(row['date_time'] as String),
+          foods: foods,
+          notes: row['notes'] as String?,
+          photoPath: row['photo_path'] as String?,
+        ));
+      }
+
+      return meals;
+    } catch (e) {
+      print('Erro ao buscar refeições no Supabase: $e');
+      return [];
     }
   }
 }
