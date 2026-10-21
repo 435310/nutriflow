@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/chat_message.dart';
 import '../models/meal.dart';
 import '../models/symptom_report.dart';
 import '../models/weight_entry.dart';
@@ -333,6 +334,80 @@ class AuthService {
     } catch (e) {
       print('Erro ao buscar sintomas do paciente: $e');
       return [];
+    }
+  }
+
+  // ============================================
+  // CHAT
+  // ============================================
+  Future<String?> sendMessageToCloud(String text, {required bool isFromPatient}) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      await _supabase.from('chat_messages').insert({
+        'sender_id': user.id,
+        'receiver_id': '00000000-0000-0000-0000-000000000000',
+        'text': text,
+        'is_from_patient': isFromPatient,
+        'is_read': false,
+      });
+
+      return null;
+    } catch (e) {
+      print('Erro ao enviar mensagem no Supabase: $e');
+      return 'Erro ao enviar mensagem: $e';
+    }
+  }
+
+  Future<List<ChatMessage>> getChatMessagesFromCloud() async {
+    try {
+      final response = await _supabase
+          .from('chat_messages')
+          .select()
+          .order('created_at', ascending: true);
+
+      final List<ChatMessage> messages = [];
+      for (final row in response) {
+        messages.add(ChatMessage(
+          id: row['id'] as String,
+          text: row['text'] as String,
+          timestamp: DateTime.parse(row['created_at'] as String),
+          isFromPatient: row['is_from_patient'] as bool,
+          isRead: row['is_read'] as bool? ?? true,
+        ));
+      }
+      return messages;
+    } catch (e) {
+      print('Erro ao buscar mensagens no Supabase: $e');
+      return [];
+    }
+  }
+
+  Future<int> countUnreadMessagesFromCloud({required bool forNutritionist}) async {
+    try {
+      final response = await _supabase
+          .from('chat_messages')
+          .select('id')
+          .eq('is_from_patient', forNutritionist)
+          .eq('is_read', false);
+      
+      return (response as List).length;
+    } catch (e) {
+      print('Erro ao contar mensagens não lidas: $e');
+      return 0;
+    }
+  }
+
+  Future<void> markMessagesAsReadInCloud({required bool byNutritionist}) async {
+    try {
+      await _supabase
+          .from('chat_messages')
+          .update({'is_read': true})
+          .eq('is_from_patient', byNutritionist)
+          .eq('is_read', false);
+    } catch (e) {
+      print('Erro ao marcar mensagens como lidas: $e');
     }
   }
 

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
-import '../../../services/local_storage_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/user_avatar.dart';
 
+/// ============================================
+/// TELA: LISTA DE MENSAGENS DO NUTRICIONISTA (Nuvem)
+/// ============================================
 class NutritionistMessagesPage extends StatefulWidget {
   const NutritionistMessagesPage({super.key});
 
@@ -13,7 +17,7 @@ class NutritionistMessagesPage extends StatefulWidget {
 }
 
 class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
-  final _storage = LocalStorageService();
+  final _authService = AuthService();
   int _unreadCount = 0;
   bool _isLoading = true;
 
@@ -24,7 +28,7 @@ class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
   }
 
   Future<void> _loadData() async {
-    final count = await _storage.countUnreadMessages(forNutritionist: true);
+    final count = await _authService.countUnreadMessagesFromCloud(forNutritionist: true);
     if (!mounted) return;
     setState(() {
       _unreadCount = count;
@@ -48,7 +52,7 @@ class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
                 InkWell(
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.nutritionistChat);
-                    _loadData(); // Recarrega ao voltar
+                    _loadData();
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
@@ -61,7 +65,7 @@ class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
                     ),
                     child: Row(
                       children: [
-                        const UserAvatar(name: 'Maria Silva', size: UserAvatarSize.medium),
+                        const UserAvatar(name: 'Paciente', size: UserAvatarSize.medium),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
@@ -69,7 +73,7 @@ class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
                             children: [
                               Row(
                                 children: [
-                                  Text('Maria Silva', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
+                                  Text('Paciente', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
                                   const Spacer(),
                                   Text('Agora', style: AppTextStyles.caption),
                                 ],

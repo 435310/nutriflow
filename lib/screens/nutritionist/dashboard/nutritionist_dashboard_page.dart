@@ -6,7 +6,6 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/nutritionist_dashboard.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/local_storage_service.dart';
 import '../../../widgets/nutritionist_bottom_nav.dart';
 import '../../../widgets/patient_list_item.dart';
 import '../../../widgets/patient_summary_card.dart';
@@ -30,12 +29,11 @@ class _NutritionistDashboardPageState
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
-  final _storage = LocalStorageService();
   final _authService = AuthService();
   
   int _currentNavIndex = 0;
   int _unreadMessages = 0;
-  String _nutritionistName = 'Nutricionista'; // ⚠️ Nome vindo do banco
+  String _nutritionistName = 'Nutricionista';
 
   final NutritionistDashboard _dashboard = NutritionistDashboard.mock();
 
@@ -54,7 +52,7 @@ class _NutritionistDashboardPageState
 
     _controller.forward();
     _loadUnreadMessages();
-    _loadNutritionistName(); // ⚠️ Busca o nome real
+    _loadNutritionistName();
   }
 
   @override
@@ -63,7 +61,6 @@ class _NutritionistDashboardPageState
     super.dispose();
   }
 
-  // ⚠️ CARREGA O NOME REAL DO SUPABASE
   Future<void> _loadNutritionistName() async {
     try {
       final user = _authService.currentUser;
@@ -86,7 +83,8 @@ class _NutritionistDashboardPageState
   }
 
   Future<void> _loadUnreadMessages() async {
-    final count = await _storage.countUnreadMessages(forNutritionist: true);
+    // ⚠️ BUSCA AS MENSAGENS NÃO LIDAS DA NUVEM
+    final count = await _authService.countUnreadMessagesFromCloud(forNutritionist: true);
     if (mounted) {
       setState(() {
         _unreadMessages = count;
@@ -245,14 +243,12 @@ class _NutritionistDashboardPageState
   }
 
   Widget _buildHeader() {
-    // Remove o prefixo "Dra." se o nome já começar com ele
     final displayName = _nutritionistName.startsWith('Dra.') || _nutritionistName.startsWith('Dr.')
         ? _nutritionistName
         : 'Dra. $_nutritionistName';
 
     return Row(
       children: [
-        // Avatar com o nome real
         UserAvatar(
           name: _nutritionistName,
           size: UserAvatarSize.medium,

@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/chat_message.dart';
-import '../../../services/local_storage_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/user_avatar.dart';
 
+/// ============================================
+/// TELA: CHAT (Integrado ao Supabase)
+/// ============================================
 class ChatPage extends StatefulWidget {
   final bool isNutritionist;
-  final String otherPartyName;
+  final String otherPartyName; // Nome provisório enquanto carrega
 
   const ChatPage({super.key, required this.isNutritionist, required this.otherPartyName});
 
@@ -17,17 +21,19 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final _storage = LocalStorageService();
+  final _authService = AuthService();
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
 
   List<ChatMessage> _messages = [];
   bool _isLoading = true;
+  String _displayName = '';
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _displayName = widget.otherPartyName;
+    _loadChat();
   }
 
   @override
@@ -37,17 +43,37 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
-    final messages = await _storage.loadChatMessages();
+  Future<void> _loadChat() async {
+    final messages = await _authService.getChatMessagesFromCloud();
+    
+    // Tenta descobrir o nome real de quem está do outro lado
+    String realName = widget.otherPartyName;
+    try {
+      if (widget.isNutritionist) {
+        // Se sou o Nutri, busco o nome do primeiro paciente
+        final patients = await _authService.getAllPatients();
+        if (patients.isNotEmpty) {
+          realName = patients.first['name'] ?? 'Paciente';
+        }
+      } else {
+        // Se sou o Paciente, busco o nome do Nutri
+        final patients = await _authService.getAllPatients(); 
+        // (No MVP, o paciente não tem acesso a lista de nutris, então mantemos o nome padrão passado)
+      }
+    } catch (e) {
+      print('Erro ao buscar nome: $e');
+    }
+
     if (!mounted) return;
 
     setState(() {
       _messages = messages;
+      _displayName = realName;
       _isLoading = false;
     });
 
     _scrollToBottom();
-    await _storage.markMessagesAsRead(byNutritionist: widget.isNutritionist);
+    await _authService.markMessagesAsReadInCloud(byNutritionist: widget.isNutritionist);
   }
 
   Future<void> _sendMessage() async {
@@ -55,17 +81,22 @@ class _ChatPageState extends State<ChatPage> {
     if (text.isEmpty) return;
 
     _messageController.clear();
-    final message = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      text: text,
-      timestamp: DateTime.now(),
+
+    final error = await _authService.sendMessageToCloud(
+      text,
       isFromPatient: !widget.isNutritionist,
-      isRead: false,
     );
 
-    setState(() => _messages.add(message));
-    _scrollToBottom();
-    await _storage.saveChatMessage(message);
+    if (error != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        );
+      }
+      return;
+    }
+
+    _loadChat();
   }
 
   void _scrollToBottom() {
@@ -83,13 +114,13 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(
         title: Row(
           children: [
-            UserAvatar(name: widget.otherPartyName, size: UserAvatarSize.small),
+            UserAvatar(name: _displayName, size: UserAvatarSize.small),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(widget.otherPartyName, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
+                  Text(_displayName, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold)),
                   Text('Online', style: AppTextStyles.caption.copyWith(fontSize: 11, color: AppColors.success)),
                 ],
               ),
