@@ -23,7 +23,6 @@ class AuthService {
     required bool isNutritionist,
   }) async {
     try {
-      // 1. Cria o usuário na autenticação do Supabase
       final response = await _supabase.auth.signUp(
         email: email.trim(),
         password: password,
@@ -32,7 +31,6 @@ class AuthService {
       final user = response.user;
       if (user == null) return 'Erro ao criar usuário.';
 
-      // 2. Salva os dados extras na tabela correta
       if (isNutritionist) {
         await _supabase.from('nutritionist_profiles').insert({
           'id': user.id,
@@ -53,9 +51,9 @@ class AuthService {
 
       return null; // Sucesso!
     } on AuthException catch (e) {
-      return e.message; // Erro de autenticação
+      return e.message;
     } catch (e) {
-      return 'Erro inesperado: $e'; // Outros erros
+      return 'Erro inesperado: $e';
     }
   }
 
@@ -71,7 +69,7 @@ class AuthService {
         email: email.trim(),
         password: password,
       );
-      return null; // Sucesso
+      return null;
     } on AuthException catch (e) {
       return e.message;
     } catch (e) {
@@ -86,8 +84,8 @@ class AuthService {
     await _supabase.auth.signOut();
   }
 
-    // ============================================
-  // BUSCAR PERFIL DO PACIENTE NO BANCO
+  // ============================================
+  // BUSCAR PERFIL DO PACIENTE
   // ============================================
   Future<Map<String, dynamic>?> getPatientProfile() async {
     try {
@@ -104,6 +102,27 @@ class AuthService {
     } catch (e) {
       print('Erro ao buscar perfil: $e');
       return null;
+    }
+  }
+
+  // ============================================
+  // VERIFICAR SE É NUTRICIONISTA
+  // ============================================
+  Future<bool> isNutritionist() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
+      final response = await _supabase
+          .from('nutritionist_profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      return response != null;
+    } catch (e) {
+      print('Erro ao verificar tipo de usuário: $e');
+      return false;
     }
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/nutritionist_dashboard.dart';
+import '../../../services/auth_service.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../widgets/nutritionist_bottom_nav.dart';
 import '../../../widgets/patient_list_item.dart';
@@ -29,8 +31,11 @@ class _NutritionistDashboardPageState
   late Animation<double> _fadeIn;
 
   final _storage = LocalStorageService();
+  final _authService = AuthService();
+  
   int _currentNavIndex = 0;
   int _unreadMessages = 0;
+  String _nutritionistName = 'Nutricionista'; // ⚠️ Nome vindo do banco
 
   final NutritionistDashboard _dashboard = NutritionistDashboard.mock();
 
@@ -49,12 +54,35 @@ class _NutritionistDashboardPageState
 
     _controller.forward();
     _loadUnreadMessages();
+    _loadNutritionistName(); // ⚠️ Busca o nome real
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  // ⚠️ CARREGA O NOME REAL DO SUPABASE
+  Future<void> _loadNutritionistName() async {
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+      
+      final response = await Supabase.instance.client
+          .from('nutritionist_profiles')
+          .select('name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+          
+      if (mounted && response != null) {
+        setState(() {
+          _nutritionistName = response['name'] as String? ?? 'Nutricionista';
+        });
+      }
+    } catch (e) {
+      print('Erro ao buscar nome do nutri: $e');
+    }
   }
 
   Future<void> _loadUnreadMessages() async {
@@ -150,8 +178,7 @@ class _NutritionistDashboardPageState
                       child: StatusCountChip(
                         status: PatientStatus.noInteraction,
                         count: _dashboard.noInteractionCount,
-                        onTap: () =>
-                            _showComingSoon('Filtro: Sem interação'),
+                        onTap: () => _showComingSoon('Filtro: Sem interação'),
                       ),
                     ),
                   ],
@@ -218,10 +245,16 @@ class _NutritionistDashboardPageState
   }
 
   Widget _buildHeader() {
+    // Remove o prefixo "Dra." se o nome já começar com ele
+    final displayName = _nutritionistName.startsWith('Dra.') || _nutritionistName.startsWith('Dr.')
+        ? _nutritionistName
+        : 'Dra. $_nutritionistName';
+
     return Row(
       children: [
-        const UserAvatar(
-          name: 'Dra. Ana Costa',
+        // Avatar com o nome real
+        UserAvatar(
+          name: _nutritionistName,
           size: UserAvatarSize.medium,
         ),
         const SizedBox(width: 14),
@@ -230,7 +263,7 @@ class _NutritionistDashboardPageState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${_getGreeting()}, Dra. Ana!',
+                '${_getGreeting()}, $displayName!',
                 style: AppTextStyles.h3,
                 overflow: TextOverflow.ellipsis,
               ),

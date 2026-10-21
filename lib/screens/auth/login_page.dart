@@ -94,11 +94,18 @@ class _LoginPageState extends State<LoginPage>
     );
 
     if (!mounted) return;
-    setState(() => _isSaving = false);
 
     if (error == null) {
-      // Sucesso! Vai para o Dashboard do Paciente.
-      // (Como ainda não temos a tela para diferenciar Nutri, assumimos que o login de teste é do Paciente)
+      // ⚠️ Verifica se é nutricionista ou paciente
+      final isNutri = await authService.isNutritionist();
+      
+      // ⚠️ ADICIONE ESTA LINHA PARA DEBUG
+      print('É NUTRICIONISTA? $isNutri');
+
+      if (!mounted) return;
+      
+      setState(() => _isSaving = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Login realizado com sucesso!'),
@@ -108,9 +115,16 @@ class _LoginPageState extends State<LoginPage>
       );
 
       Future.delayed(const Duration(milliseconds: 1000), () {
-        if (mounted) AppRoutes.go(context, AppRoutes.patientDashboard);
+        if (mounted) {
+          if (isNutri) {
+            AppRoutes.go(context, AppRoutes.nutritionistDashboard);
+          } else {
+            AppRoutes.go(context, AppRoutes.patientDashboard);
+          }
+        }
       });
     } else {
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),

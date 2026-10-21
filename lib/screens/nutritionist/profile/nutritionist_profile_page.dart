@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
-import '../../../models/nutritionist_profile.dart';
-import '../../../services/local_storage_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/user_avatar.dart';
 
 class NutritionistProfilePage extends StatefulWidget {
@@ -15,8 +15,8 @@ class NutritionistProfilePage extends StatefulWidget {
 }
 
 class _NutritionistProfilePageState extends State<NutritionistProfilePage> {
-  final _storage = LocalStorageService();
-  NutritionistProfile? _profile;
+  final _authService = AuthService();
+  Map<String, dynamic>? _profile;
   bool _isLoading = true;
 
   @override
@@ -26,13 +26,30 @@ class _NutritionistProfilePageState extends State<NutritionistProfilePage> {
   }
 
   Future<void> _loadProfile() async {
-    final profile = await _storage.loadNutritionistProfile();
-    if (!mounted) return;
-    setState(() {
-      _profile = profile ?? NutritionistProfile.mock();
-      _isLoading = false;
-    });
-    if (profile == null) await _storage.saveNutritionistProfile(_profile!);
+    try {
+      final user = _authService.currentUser;
+      if (user == null) return;
+
+      final response = await Supabase.instance.client
+          .from('nutritionist_profiles')
+          .select()
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (!mounted) return;
+      setState(() {
+        _profile = response;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Erro: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    await _authService.signOut();
+    if (mounted) AppRoutes.go(context, AppRoutes.welcome);
   }
 
   @override
@@ -45,7 +62,11 @@ class _NutritionistProfilePageState extends State<NutritionistProfilePage> {
       );
     }
 
-    final profile = _profile!;
+    final name = _profile!['name'] ?? 'Nutricionista';
+    final email = _profile!['email'] ?? '';
+    final crn = _profile!['crn'] ?? '';
+    final specialty = _profile!['specialty'] ?? '';
+    final bio = _profile!['bio'] ?? 'Não informado';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -58,13 +79,12 @@ class _NutritionistProfilePageState extends State<NutritionistProfilePage> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              UserAvatar(name: profile.name, size: UserAvatarSize.large),
+              UserAvatar(name: name, size: UserAvatarSize.large),
               const SizedBox(height: 20),
-              Text(profile.name, style: AppTextStyles.h2, textAlign: TextAlign.center),
+              Text(name, style: AppTextStyles.h2, textAlign: TextAlign.center),
               const SizedBox(height: 4),
-              Text(profile.email, style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
+              Text(email, style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
               const SizedBox(height: 32),
-
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -89,23 +109,27 @@ class _NutritionistProfilePageState extends State<NutritionistProfilePage> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    _buildInfoRow('CRN', profile.crn),
-                    _buildInfoRow('Especialidade', profile.specialty),
-                    _buildInfoRow('Bio', profile.bio ?? 'Não informado'),
+                    _buildInfoRow('CRN', crn),
+                    _buildInfoRow('Especialidade', specialty),
+                    _buildInfoRow('Bio', bio),
                   ],
                 ),
               ),
-
               const SizedBox(height: 32),
-
-              // ⚠️ BOTÃO DE EDITAR PERFIL CORRIGIDO
               ElevatedButton.icon(
                 onPressed: () async {
                   await Navigator.pushNamed(context, AppRoutes.editNutritionistProfile);
-                  _loadProfile(); // Recarrega os dados ao voltar
+                  _loadProfile();
                 },
                 icon: const Icon(Icons.edit_outlined),
                 label: const Text('Editar perfil'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _handleLogout,
+                icon: const Icon(Icons.logout, color: AppColors.error),
+                label: const Text('Sair', style: TextStyle(color: AppColors.error)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
               ),
             ],
           ),
@@ -121,9 +145,7 @@ class _NutritionistProfilePageState extends State<NutritionistProfilePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(width: 110, child: Text(label, style: AppTextStyles.caption)),
-          Expanded(
-            child: Text(value, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500)),
-          ),
+          Expanded(child: Text(value, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500))),
         ],
       ),
     );
