@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
 import '../core/constants/app_strings.dart';
 import 'routes.dart';
+import '../main.dart'; // ⚠️ Importa o routeObserver
 
 /// ============================================
 /// APLICATIVO NUTRIFLOW
@@ -18,7 +19,9 @@ class NutriFlowApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       
-      // A rota inicial agora é o AuthWrapper
+      // ⚠️ Adiciona o observador para monitorar as rotas
+      navigatorObservers: [routeObserver],
+
       initialRoute: '/auth-wrapper',
       
       routes: {
@@ -63,37 +66,30 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Escuta as mudanças de autenticação em tempo real
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        // Se estiver carregando, mostra uma tela vazia
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: Colors.green)),
+            body: Center(child: CircularProgressIndicator(color: Color(0xFF1FA774))),
           );
         }
 
-        // Se tem usuário logado, vai pro dashboard do paciente
         if (Supabase.instance.client.auth.currentUser != null) {
-          // NOTA: Aqui futuramente vamos verificar se é paciente ou nutricionista
           return const _DashboardRedirect();
         }
 
-        // Se não tem, vai pra tela de Welcome
         return const _WelcomeRedirect();
       },
     );
   }
 }
 
-// Widgets auxiliares para não precisar recarregar a tela toda
 class _WelcomeRedirect extends StatelessWidget {
   const _WelcomeRedirect();
 
   @override
   Widget build(BuildContext context) {
-    // Navega para a Welcome logo após o primeiro frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.of(context).pushReplacementNamed(AppRoutes.welcome);
     });
@@ -106,7 +102,9 @@ class _DashboardRedirect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Navega para o Dashboard logo após o primeiro frame
+    // NOTA: Aqui deveríamos verificar se é paciente ou nutri para redirecionar corretamente.
+    // Como simplificação, se já está logado, vai pro dashboard de paciente (ou nutri).
+    // Na prática, o AuthWrapper deveria checar a tabela do banco.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.of(context).pushReplacementNamed(AppRoutes.patientDashboard);
     });

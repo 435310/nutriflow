@@ -51,7 +51,9 @@ class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
               children: [
                 InkWell(
                   onTap: () async {
+                    // ⚠️ Aguarda a tela de chat fechar
                     await Navigator.pushNamed(context, AppRoutes.nutritionistChat);
+                    // ⚠️ Quando voltar, recarrega os dados para zerar o badge local
                     _loadData();
                   },
                   borderRadius: BorderRadius.circular(16),

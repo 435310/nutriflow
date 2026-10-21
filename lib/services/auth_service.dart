@@ -411,6 +411,16 @@ class AuthService {
     }
   }
 
+  /// Stream que escuta o banco de dados em tempo real para atualizar o badge
+  Stream<int> watchUnreadMessages({required bool forNutritionist}) {
+    return _supabase
+        .from('chat_messages')
+        .stream(primaryKey: ['id'])
+        .eq('is_from_patient', forNutritionist)
+        .eq('is_read', false)
+        .map((list) => list.length);
+  }
+
   // ============================================
   // NUTRICIONISTA: LISTAR PACIENTES E DADOS
   // ============================================

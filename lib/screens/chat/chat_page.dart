@@ -8,11 +8,16 @@ import '../../../services/auth_service.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
+/// AVISO GLOBAL PARA O BADGE DE MENSAGENS
+/// ============================================
+final ValueNotifier<int> unreadMessagesNotifier = ValueNotifier<int>(0);
+
+/// ============================================
 /// TELA: CHAT (Integrado ao Supabase)
 /// ============================================
 class ChatPage extends StatefulWidget {
   final bool isNutritionist;
-  final String otherPartyName; // Nome provisório enquanto carrega
+  final String otherPartyName;
 
   const ChatPage({super.key, required this.isNutritionist, required this.otherPartyName});
 
@@ -46,19 +51,13 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _loadChat() async {
     final messages = await _authService.getChatMessagesFromCloud();
     
-    // Tenta descobrir o nome real de quem está do outro lado
     String realName = widget.otherPartyName;
     try {
       if (widget.isNutritionist) {
-        // Se sou o Nutri, busco o nome do primeiro paciente
         final patients = await _authService.getAllPatients();
         if (patients.isNotEmpty) {
           realName = patients.first['name'] ?? 'Paciente';
         }
-      } else {
-        // Se sou o Paciente, busco o nome do Nutri
-        final patients = await _authService.getAllPatients(); 
-        // (No MVP, o paciente não tem acesso a lista de nutris, então mantemos o nome padrão passado)
       }
     } catch (e) {
       print('Erro ao buscar nome: $e');
@@ -73,7 +72,13 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     _scrollToBottom();
+    
+    // Marca como lido no banco
     await _authService.markMessagesAsReadInCloud(byNutritionist: widget.isNutritionist);
+    
+    // Avisa o app para atualizar o badge
+    final newCount = await _authService.countUnreadMessagesFromCloud(forNutritionist: widget.isNutritionist);
+    unreadMessagesNotifier.value = newCount;
   }
 
   Future<void> _sendMessage() async {
