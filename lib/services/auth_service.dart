@@ -84,7 +84,7 @@ class AuthService {
   }
 
   // ============================================
-  // PERFIL DO PACIENTE
+  // PERFIL DO PACIENTE (Logado)
   // ============================================
   Future<Map<String, dynamic>?> getPatientProfile() async {
     try {
@@ -105,7 +105,7 @@ class AuthService {
   }
 
   // ============================================
-  // VERIFICAR SE É NUTRICIONISTA
+  // VERIFICAR TIPO DE USUÁRIO
   // ============================================
   Future<bool> isNutritionist() async {
     try {
@@ -213,7 +213,6 @@ class AuthService {
       final user = _supabase.auth.currentUser;
       if (user == null) return 'Usuário não logado';
 
-      // Remove o peso do mesmo dia para não duplicar
       final today = DateTime(entry.date.year, entry.date.month, entry.date.day);
       final startOfDay = today.toIso8601String();
       final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59).toIso8601String();
@@ -225,7 +224,6 @@ class AuthService {
           .gte('date', startOfDay)
           .lte('date', endOfDay);
 
-      // Insere o novo
       await _supabase.from('weight_entries').insert({
         'patient_id': user.id,
         'date': entry.date.toIso8601String(),
@@ -265,6 +263,83 @@ class AuthService {
       return entries;
     } catch (e) {
       print('Erro ao buscar pesos no Supabase: $e');
+      return [];
+    }
+  }
+
+  // ============================================
+  // NUTRICIONISTA: LISTAR PACIENTES
+  // ============================================
+  Future<List<Map<String, dynamic>>> getAllPatients() async {
+    try {
+      final response = await _supabase
+          .from('patient_profiles')
+          .select()
+          .order('name', ascending: true);
+      return response;
+    } catch (e) {
+      print('Erro ao buscar pacientes: $e');
+      return [];
+    }
+  }
+
+  // ============================================
+  // NUTRICIONISTA: DADOS DE UM PACIENTE ESPECÍFICO
+  // ============================================
+  Future<List<Meal>> getPatientMeals(String userId) async {
+    try {
+      final response = await _supabase
+          .from('meal_entries')
+          .select()
+          .eq('patient_id', userId)
+          .order('date_time', ascending: false)
+          .limit(3);
+
+      final List<Meal> meals = [];
+      for (final row in response) {
+        final foodsList = (row['foods'] as List<dynamic>?) ?? [];
+        final foods = foodsList.map((f) => FoodItem(
+          name: f['name'] as String,
+          quantity: (f['quantity'] as num).toDouble(),
+          unit: f['unit'] as String? ?? 'g',
+          calories: (f['calories'] as num?)?.toDouble(),
+        )).toList();
+
+        meals.add(Meal(
+          id: row['id'] as String,
+          type: MealType.values.firstWhere((t) => t.name == row['type'], orElse: () => MealType.lunch),
+          dateTime: DateTime.parse(row['date_time'] as String),
+          foods: foods,
+          notes: row['notes'] as String?,
+        ));
+      }
+      return meals;
+    } catch (e) {
+      print('Erro ao buscar refeições do paciente: $e');
+      return [];
+    }
+  }
+
+  Future<List<WeightEntry>> getPatientWeights(String userId) async {
+    try {
+      final response = await _supabase
+          .from('weight_entries')
+          .select()
+          .eq('patient_id', userId)
+          .order('date', ascending: true);
+
+      final List<WeightEntry> entries = [];
+      for (final row in response) {
+        entries.add(WeightEntry(
+          id: row['id'] as String,
+          date: DateTime.parse(row['date'] as String),
+          weightKg: (row['weight_kg'] as num).toDouble(),
+          notes: row['notes'] as String?,
+        ));
+      }
+      return entries;
+    } catch (e) {
+      print('Erro ao buscar pesos do paciente: $e');
       return [];
     }
   }

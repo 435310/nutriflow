@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
-import '../../../models/patient_detail.dart';
-import '../../../models/symptom_report.dart';
+import '../../../models/weight_entry.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/mini_weight_chart.dart';
 import '../../../widgets/patient_detail_section.dart';
 import '../../../widgets/user_avatar.dart';
@@ -25,12 +26,27 @@ class _PatientDetailPageState extends State<PatientDetailPage>
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
-  final PatientDetail _detail = PatientDetail.mock();
+  final _authService = AuthService();
+  
+  String? _patientId;
+  Map<String, dynamic>? _profile;
+  List<WeightEntry> _weightHistory = [];
+  List<Meal> _recentMeals = [];
+  bool _isLoading = true;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args != null && args is String && _patientId == null) {
+      _patientId = args;
+      _initController();
+      _loadData();
+    }
+  }
 
+  void _initController() {
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -49,54 +65,168 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     super.dispose();
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature em breve'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+  Future<void> _loadData() async {
+    if (_patientId == null) return;
+
+    try {
+      final profileResponse = await Supabase.instance.client
+          .from('patient_profiles')
+          .select()
+          .eq('id', _patientId!)
+          .maybeSingle();
+
+      final weights = await _authService.getPatientWeights(_patientId!);
+      final meals = await _authService.getPatientMeals(_patientId!);
+
+      if (!mounted) return;
+
+      setState(() {
+        _profile = profileResponse;
+        _weightHistory = weights;
+        _recentMeals = meals;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Erro ao carregar dados do paciente: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  void _showOptionsMenu() {
+  // ============================================
+  // MODAL DE DETALHES DA REFEIÇÃO
+  // ============================================
+  void _showMealDetails(Meal meal) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _OptionsBottomSheet(
-        onEdit: () {
-          Navigator.pop(context);
-          _showComingSoon('Editar paciente');
-        },
-        onArchive: () {
-          Navigator.pop(context);
-          _showComingSoon('Arquivar paciente');
-        },
-        onDelete: () {
-          Navigator.pop(context);
-          _showComingSoon('Excluir paciente');
-        },
-      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Alça de arrastar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Cabeçalho da refeição
+              Row(
+                children: [
+                  Text(meal.type.icon, style: const TextStyle(fontSize: 28)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(meal.type.label, style: AppTextStyles.h2),
+                        Text(
+                          '${meal.dateTime.hour.toString().padLeft(2, '0')}:${meal.dateTime.minute.toString().padLeft(2, '0')}',
+                          style: AppTextStyles.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              Text('Alimentos', style: AppTextStyles.h3),
+              const SizedBox(height: 12),
+              
+              // Lista de alimentos
+              ...meal.foods.map((food) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(food.name, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500)),
+                      ),
+                      Text(
+                        '${food.quantity.toStringAsFixed(food.quantity.truncate() == food.quantity ? 0 : 1)} ${food.unit}',
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+
+              // Observações (se tiver)
+              if (meal.notes != null && meal.notes!.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text('Observações', style: AppTextStyles.h3),
+                const SizedBox(height: 8),
+                Text(meal.notes!, style: AppTextStyles.bodySecondary.copyWith(fontStyle: FontStyle.italic)),
+              ],
+
+              const SizedBox(height: 32),
+            ],
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final profile = _detail.profile;
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Paciente')),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    if (_profile == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Paciente')),
+        body: const Center(child: Text('Paciente não encontrado')),
+      );
+    }
+
+    final name = _profile!['name'] ?? 'Sem nome';
+    final email = _profile!['email'] ?? 'Sem e-mail';
+
+    double? currentWeight = _weightHistory.isNotEmpty ? _weightHistory.last.weightKg : null;
+    double? initialWeight = _weightHistory.isNotEmpty ? _weightHistory.first.weightKg : null;
+    double? delta = (currentWeight != null && initialWeight != null) ? currentWeight - initialWeight : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(profile.name),
+        title: Text(name),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => AppRoutes.back(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: _showOptionsMenu,
-          ),
-        ],
       ),
       body: SafeArea(
         child: FadeTransition(
@@ -105,186 +235,75 @@ class _PatientDetailPageState extends State<PatientDetailPage>
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                _buildHeader(profile),
+                UserAvatar(name: name, size: UserAvatarSize.large),
+                const SizedBox(height: 16),
+                Text(name, style: AppTextStyles.h2, textAlign: TextAlign.center),
+                const SizedBox(height: 4),
+                Text(email, style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
                 const SizedBox(height: 28),
 
-                // Resumo
                 PatientDetailSection(
                   icon: Icons.insights_outlined,
                   title: 'Resumo',
                   child: Column(
                     children: [
-                      _buildInfoRow(
-                        'Peso atual',
-                        profile.currentWeightKg != null
-                            ? '${profile.currentWeightKg!.toStringAsFixed(1)} kg'
-                            : '—',
-                      ),
+                      _buildInfoRow('Peso atual', currentWeight != null ? '${currentWeight.toStringAsFixed(1)} kg' : 'Não registrado'),
                       _buildInfoRow(
                         'Variação',
-                        profile.weightDelta != null
-                            ? '${profile.weightDelta! < 0 ? '▼' : '▲'} ${profile.weightDelta!.abs().toStringAsFixed(1)} kg'
-                            : '—',
-                        valueColor: profile.weightDelta == null
-                            ? null
-                            : profile.weightDelta! < 0
-                                ? AppColors.success
-                                : AppColors.warning,
+                        delta != null ? '${delta < 0 ? '▼' : '▲'} ${delta.abs().toStringAsFixed(1)} kg' : '—',
+                        valueColor: delta == null ? null : delta < 0 ? AppColors.success : AppColors.warning,
                       ),
-                      _buildInfoRow(
-                        'Meta',
-                        profile.goalWeightKg != null
-                            ? '${profile.goalWeightKg!.toStringAsFixed(1)} kg'
-                            : '—',
-                      ),
-                      _buildInfoRow(
-                        'IMC',
-                        profile.bmi != null
-                            ? '${profile.bmi!.toStringAsFixed(1)} (${profile.bmiCategory})'
-                            : '—',
-                      ),
+                      _buildInfoRow('Peso inicial', initialWeight != null ? '${initialWeight.toStringAsFixed(1)} kg' : 'Não registrado'),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
 
-                // Evolução de peso
                 PatientDetailSection(
                   icon: Icons.show_chart,
                   title: 'Evolução de peso',
-                  trailing: TextButton(
-                    onPressed: () => _showComingSoon('Ver gráfico completo'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('Ver mais'),
-                  ),
                   child: Column(
                     children: [
-                      MiniWeightChart(
-                        entries: _detail.weightHistory,
-                        height: 70,
-                      ),
+                      MiniWeightChart(entries: _weightHistory, height: 70),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Text(
-                            '${_detail.weightHistory.length} registros',
-                            style: AppTextStyles.caption,
-                          ),
+                          Text('${_weightHistory.length} registros', style: AppTextStyles.caption),
                           const Spacer(),
-                          Text(
-                            'Últimos 90 dias',
-                            style: AppTextStyles.caption,
-                          ),
+                          Text('Últimos 90 dias', style: AppTextStyles.caption),
                         ],
                       ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
 
-                // Sintomas e dificuldades
-                PatientDetailSection(
-                  icon: Icons.psychology_outlined,
-                  title: 'Sintomas e dificuldades',
-                  trailing: _detail.recentSymptoms.isNotEmpty
-                      ? TextButton(
-                          onPressed: () => _showComingSoon('Ver todos'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: const Text('Ver todos'),
-                        )
-                      : null,
-                  child: _detail.recentSymptoms.isEmpty
-                      ? _buildEmptyInfo('Nenhum relato de sintomas')
-                      : Column(
-                          children: _detail.recentSymptoms
-                              .take(2)
-                              .map((report) => _buildSymptomRow(report))
-                              .toList(),
-                        ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Últimas refeições
+                // ⚠️ REFEIÇÕES COM CLIQUE
                 PatientDetailSection(
                   icon: Icons.restaurant_menu,
                   title: 'Últimas refeições',
-                  trailing: TextButton(
-                    onPressed: () => _showComingSoon('Ver todas'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('Ver todas'),
-                  ),
-                  child: _detail.recentMeals.isEmpty
+                  child: _recentMeals.isEmpty
                       ? _buildEmptyInfo('Nenhuma refeição registrada')
                       : Column(
-                          children: _detail.recentMeals
-                              .map((meal) => _buildMealRow(meal))
-                              .toList(),
+                          children: _recentMeals.map((meal) {
+                            return InkWell(
+                              onTap: () => _showMealDetails(meal),
+                              borderRadius: BorderRadius.circular(10),
+                              child: _buildMealRow(meal),
+                            );
+                          }).toList(),
                         ),
                 ),
-
                 const SizedBox(height: 16),
 
-                // Últimos exames
                 PatientDetailSection(
-                  icon: Icons.description_outlined,
-                  title: 'Últimos exames',
-                  trailing: TextButton(
-                    onPressed: () => _showComingSoon('Ver todos'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('Ver todos'),
-                  ),
-                  child: _detail.recentExams.isEmpty
-                      ? _buildEmptyInfo('Nenhum exame enviado')
-                      : Column(
-                          children: _detail.recentExams
-                              .map((exam) => _buildExamRow(exam))
-                              .toList(),
-                        ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Últimas mensagens
-                PatientDetailSection(
-                  icon: Icons.chat_bubble_outline,
-                  title: 'Últimas mensagens',
-                  trailing: TextButton(
-                    onPressed: () => _showComingSoon('Ver conversa'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: EdgeInsets.zero,
-                    ),
-                    child: const Text('Ver conversa'),
-                  ),
-                  child: _detail.recentMessages.isEmpty
-                      ? _buildEmptyInfo('Nenhuma mensagem')
-                      : Column(
-                          children: _detail.recentMessages
-                              .map((msg) => _buildMessageRow(msg))
-                              .toList(),
-                        ),
+                  icon: Icons.psychology_outlined,
+                  title: 'Sintomas e dificuldades',
+                  child: _buildEmptyInfo('Nenhum sintoma registrado na nuvem'),
                 ),
 
                 const SizedBox(height: 24),
 
-                // ============================================
-                // BOTÃO DE CHAT (CORRIGIDO)
-                // ============================================
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pushNamed(context, AppRoutes.nutritionistChat);
@@ -292,15 +311,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
                   icon: const Icon(Icons.chat_bubble_outline),
                   label: const Text('Enviar mensagem'),
                 ),
-
-                const SizedBox(height: 12),
-
-                OutlinedButton.icon(
-                  onPressed: () => _showComingSoon('Plano alimentar'),
-                  icon: const Icon(Icons.description_outlined),
-                  label: const Text('Ver plano alimentar'),
-                ),
-
                 const SizedBox(height: 24),
               ],
             ),
@@ -310,57 +320,12 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     );
   }
 
-  Widget _buildHeader(dynamic profile) {
-    return Column(
-      children: [
-        UserAvatar(
-          name: profile.name,
-          size: UserAvatarSize.large,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          profile.name,
-          style: AppTextStyles.h2,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          profile.email,
-          style: AppTextStyles.bodySecondary,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: AppColors.success,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Evoluindo · 2h atrás',
-              style: AppTextStyles.caption,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          SizedBox(
-            width: 110,
-            child: Text(label, style: AppTextStyles.caption),
-          ),
+          SizedBox(width: 110, child: Text(label, style: AppTextStyles.caption)),
           Expanded(
             child: Text(
               value,
@@ -376,16 +341,11 @@ class _PatientDetailPageState extends State<PatientDetailPage>
   }
 
   Widget _buildMealRow(Meal meal) {
-    final time =
-        '${meal.dateTime.hour.toString().padLeft(2, '0')}:${meal.dateTime.minute.toString().padLeft(2, '0')}';
-
+    final time = '${meal.dateTime.hour.toString().padLeft(2, '0')}:${meal.dateTime.minute.toString().padLeft(2, '0')}';
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
           Text(meal.type.icon, style: const TextStyle(fontSize: 18)),
@@ -394,16 +354,8 @@ class _PatientDetailPageState extends State<PatientDetailPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  meal.type.label,
-                  style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  '${meal.foods.length} alimento${meal.foods.length > 1 ? 's' : ''}',
-                  style: AppTextStyles.caption,
-                ),
+                Text(meal.type.label, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500)),
+                Text('${meal.foods.length} alimento${meal.foods.length > 1 ? 's' : ''}', style: AppTextStyles.caption),
               ],
             ),
           ),
@@ -413,287 +365,10 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     );
   }
 
-  Widget _buildExamRow(PatientExam exam) {
-    final isPending = exam.status == ExamStatus.pending;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Container(
-            height: 32,
-            width: 32,
-            decoration: BoxDecoration(
-              color: (isPending ? AppColors.warning : AppColors.success)
-                  .withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              isPending ? Icons.pending_outlined : Icons.check_circle_outline,
-              size: 18,
-              color: isPending ? AppColors.warning : AppColors.success,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  exam.name,
-                  style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  exam.status.label,
-                  style: AppTextStyles.caption.copyWith(
-                    color: isPending ? AppColors.warning : AppColors.success,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(exam.timeAgo, style: AppTextStyles.caption),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageRow(PatientMessage msg) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            msg.fromPatient
-                ? Icons.person_outline
-                : Icons.medical_services_outlined,
-            size: 20,
-            color: msg.fromPatient
-                ? AppColors.textSecondary
-                : AppColors.primary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  msg.fromPatient ? 'Paciente' : 'Você',
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: msg.fromPatient
-                        ? AppColors.textSecondary
-                        : AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  msg.content,
-                  style: AppTextStyles.body.copyWith(fontSize: 14),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          Text(msg.timeAgo, style: AppTextStyles.caption),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSymptomRow(SymptomReport report) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                height: 32,
-                width: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF9B51E0).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.psychology_outlined,
-                  size: 18,
-                  color: Color(0xFF9B51E0),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  report.summary,
-                  style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              Text(
-                '${report.date.day}/${report.date.month}',
-                style: AppTextStyles.caption,
-              ),
-            ],
-          ),
-          if (report.symptoms.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: report.symptoms
-                  .map((s) => _SymptomTag(label: s, color: AppColors.error))
-                  .toList(),
-            ),
-          ],
-          if (report.difficulties.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: report.difficulties
-                  .map((d) => _SymptomTag(label: d, color: AppColors.warning))
-                  .toList(),
-            ),
-          ],
-          if (report.notes != null && report.notes!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              report.notes!,
-              style: AppTextStyles.caption.copyWith(fontStyle: FontStyle.italic),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildEmptyInfo(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Text(
-        text,
-        style: AppTextStyles.caption,
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-}
-
-// ============================================
-// BOTTOM SHEET: OPÇÕES
-// ============================================
-class _OptionsBottomSheet extends StatelessWidget {
-  final VoidCallback onEdit;
-  final VoidCallback onArchive;
-  final VoidCallback onDelete;
-
-  const _OptionsBottomSheet({
-    required this.onEdit,
-    required this.onArchive,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.edit_outlined),
-            title: const Text('Editar dados'),
-            onTap: onEdit,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.archive_outlined),
-            title: const Text('Arquivar paciente'),
-            onTap: onArchive,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(
-              Icons.delete_outline,
-              color: AppColors.error,
-            ),
-            title: const Text(
-              'Excluir paciente',
-              style: TextStyle(color: AppColors.error),
-            ),
-            onTap: onDelete,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================
-// WIDGET: TAG DE SINTOMA
-// ============================================
-class _SymptomTag extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _SymptomTag({
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-      ),
+      child: Text(text, style: AppTextStyles.caption, textAlign: TextAlign.center),
     );
   }
 }
