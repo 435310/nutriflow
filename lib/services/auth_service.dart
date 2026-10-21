@@ -106,6 +106,50 @@ class AuthService {
     }
   }
 
+  Future<String?> updatePatientProfile({
+    required String name,
+    required String email,
+    String? phone,
+    DateTime? birthDate,
+    String? gender,
+    double? heightCm,
+    double? initialWeightKg,
+    double? currentWeightKg,
+    double? goalWeightKg,
+    double? waistCm,
+    String? goal,
+    String? activityLevel,
+    List<String>? foodRestrictions,
+    List<String>? allergies,
+  }) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      await _supabase.from('patient_profiles').update({
+        'name': name.trim(),
+        'email': email.trim(),
+        'phone': phone,
+        'birth_date': birthDate?.toIso8601String(),
+        'gender': gender,
+        'height_cm': heightCm,
+        'initial_weight_kg': initialWeightKg,
+        'current_weight_kg': currentWeightKg,
+        'goal_weight_kg': goalWeightKg,
+        'waist_cm': waistCm,
+        'goal': goal,
+        'activity_level': activityLevel,
+        'food_restrictions': foodRestrictions,
+        'allergies': allergies,
+      }).eq('user_id', user.id);
+
+      return null;
+    } catch (e) {
+      print('Erro ao atualizar perfil no Supabase: $e');
+      return 'Erro ao atualizar perfil: $e';
+    }
+  }
+
   // ============================================
   // VERIFICAR TIPO DE USUÁRIO
   // ============================================
@@ -411,7 +455,6 @@ class AuthService {
     }
   }
 
-  /// Stream que escuta o banco de dados em tempo real para atualizar o badge
   Stream<int> watchUnreadMessages({required bool forNutritionist}) {
     return _supabase
         .from('chat_messages')

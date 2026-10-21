@@ -6,11 +6,10 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/local_storage_service.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
-/// TELA: PERFIL DO PACIENTE
+/// TELA: PERFIL DO PACIENTE (Nuvem)
 /// ============================================
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -35,9 +34,7 @@ class _ProfilePageState extends State<ProfilePage>
   late Animation<double> _buttonFade;
   late Animation<Offset> _buttonSlide;
 
-  final _storage = LocalStorageService();
   final _authService = AuthService();
-  
   PatientProfile? _profile;
   bool _isLoading = true;
 
@@ -99,25 +96,69 @@ class _ProfilePageState extends State<ProfilePage>
   // ============================================
   Future<void> _loadProfile() async {
     try {
-      // 1. Busca do Supabase
       final cloudProfile = await _authService.getPatientProfile();
-      
-      // 2. Busca do Storage Local (para complementar dados que ainda não estão na nuvem)
-      final localProfile = await _storage.loadProfile();
-
       if (!mounted) return;
 
       setState(() {
-        final base = localProfile ?? PatientProfile.mock();
-        
         if (cloudProfile != null) {
-          // Se achou na nuvem, sobrescreve o nome e e-mail com os dados reais
-          _profile = base.copyWith(
+          // Converte o sexo
+          Gender? gender;
+          if (cloudProfile['gender'] != null) {
+            gender = Gender.values.firstWhere(
+              (e) => e.name == cloudProfile['gender'],
+              orElse: () => Gender.other,
+            );
+          }
+
+          // Converte a data de nascimento
+          DateTime? birthDate;
+          if (cloudProfile['birth_date'] != null) {
+            birthDate = DateTime.parse(cloudProfile['birth_date']);
+          }
+
+          // Converte o objetivo
+          Goal? goal;
+          if (cloudProfile['goal'] != null) {
+            goal = Goal.values.firstWhere(
+              (e) => e.name == cloudProfile['goal'],
+              orElse: () => Goal.maintain,
+            );
+          }
+
+          // Converte a atividade
+          ActivityLevel? activityLevel;
+          if (cloudProfile['activity_level'] != null) {
+            activityLevel = ActivityLevel.values.firstWhere(
+              (e) => e.name == cloudProfile['activity_level'],
+              orElse: () => ActivityLevel.sedentary,
+            );
+          }
+
+          // ⚠️ Converte as listas do banco
+          final restrictions = (cloudProfile['food_restrictions'] as List<dynamic>?)
+                  ?.cast<String>() ??
+              [];
+          final allergies =
+              (cloudProfile['allergies'] as List<dynamic>?)?.cast<String>() ?? [];
+
+          _profile = PatientProfile.mock().copyWith(
             name: cloudProfile['name'] as String?,
             email: cloudProfile['email'] as String?,
+            phone: cloudProfile['phone'] as String?,
+            birthDate: birthDate,
+            gender: gender,
+            heightCm: (cloudProfile['height_cm'] as num?)?.toDouble(),
+            currentWeightKg: (cloudProfile['current_weight_kg'] as num?)?.toDouble(),
+            initialWeightKg: (cloudProfile['initial_weight_kg'] as num?)?.toDouble(),
+            goalWeightKg: (cloudProfile['goal_weight_kg'] as num?)?.toDouble(),
+            waistCm: (cloudProfile['waist_cm'] as num?)?.toDouble(),
+            goal: goal,
+            activityLevel: activityLevel,
+            foodRestrictions: restrictions,
+            allergies: allergies,
           );
         } else {
-          _profile = base;
+          _profile = PatientProfile.mock();
         }
         _isLoading = false;
       });
@@ -160,117 +201,122 @@ class _ProfilePageState extends State<ProfilePage>
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              FadeTransition(
-                opacity: _avatarFade,
-                child: UserAvatar(
-                  name: profile.name,
-                  size: UserAvatarSize.large,
-                ),
-              ),
-              const SizedBox(height: 20),
-              FadeTransition(
-                opacity: _nameFade,
-                child: Text(
-                  profile.name,
-                  style: AppTextStyles.h2,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 6),
-              FadeTransition(
-                opacity: _emailFade,
-                child: Text(
-                  profile.email,
-                  style: AppTextStyles.bodySecondary,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              FadeTransition(
-                opacity: _card1Fade,
-                child: SlideTransition(
-                  position: _card1Slide,
-                  child: _InfoCard(
-                    icon: Icons.person_outline,
-                    title: 'Dados pessoais',
-                    items: [
-                      _InfoItem(label: 'Telefone', value: profile.phone ?? 'Não informado'),
-                      _InfoItem(label: 'Idade', value: profile.age != null ? '${profile.age} anos' : 'Não informado'),
-                      _InfoItem(label: 'Sexo', value: profile.gender?.label ?? 'Não informado'),
-                    ],
+        child: RefreshIndicator(
+          onRefresh: _loadProfile,
+          color: AppColors.primary,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                FadeTransition(
+                  opacity: _avatarFade,
+                  child: UserAvatar(
+                    name: profile.name,
+                    size: UserAvatarSize.large,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              FadeTransition(
-                opacity: _card2Fade,
-                child: SlideTransition(
-                  position: _card2Slide,
-                  child: _InfoCard(
-                    icon: Icons.monitor_weight_outlined,
-                    title: 'Dados clínicos',
-                    items: [
-                      _InfoItem(label: 'Altura', value: profile.heightCm != null ? '${(profile.heightCm! / 100).toStringAsFixed(2)} m' : 'Não informado'),
-                      _InfoItem(label: 'Peso inicial', value: profile.initialWeightKg != null ? '${profile.initialWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
-                      _InfoItem(label: 'Peso atual', value: profile.currentWeightKg != null ? '${profile.currentWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
-                      if (profile.weightDelta != null && profile.weightDelta != 0)
+                const SizedBox(height: 20),
+                FadeTransition(
+                  opacity: _nameFade,
+                  child: Text(
+                    profile.name,
+                    style: AppTextStyles.h2,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FadeTransition(
+                  opacity: _emailFade,
+                  child: Text(
+                    profile.email,
+                    style: AppTextStyles.bodySecondary,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                FadeTransition(
+                  opacity: _card1Fade,
+                  child: SlideTransition(
+                    position: _card1Slide,
+                    child: _InfoCard(
+                      icon: Icons.person_outline,
+                      title: 'Dados pessoais',
+                      items: [
+                        _InfoItem(label: 'Telefone', value: profile.phone ?? 'Não informado'),
+                        _InfoItem(label: 'Idade', value: profile.age != null ? '${profile.age} anos' : 'Não informado'),
+                        _InfoItem(label: 'Sexo', value: profile.gender?.label ?? 'Não informado'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                FadeTransition(
+                  opacity: _card2Fade,
+                  child: SlideTransition(
+                    position: _card2Slide,
+                    child: _InfoCard(
+                      icon: Icons.monitor_weight_outlined,
+                      title: 'Dados clínicos',
+                      items: [
+                        _InfoItem(label: 'Altura', value: profile.heightCm != null ? '${(profile.heightCm! / 100).toStringAsFixed(2)} m' : 'Não informado'),
+                        _InfoItem(label: 'Peso inicial', value: profile.initialWeightKg != null ? '${profile.initialWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
+                        _InfoItem(label: 'Peso atual', value: profile.currentWeightKg != null ? '${profile.currentWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
+                        if (profile.weightDelta != null && profile.weightDelta != 0)
+                          _InfoItem(
+                            label: 'Variação',
+                            value: profile.weightDelta! < 0 ? '▼ ${profile.weightDelta!.abs().toStringAsFixed(1)} kg' : '▲ ${profile.weightDelta!.toStringAsFixed(1)} kg',
+                          ),
+                        _InfoItem(label: 'Meta', value: profile.goalWeightKg != null ? '${profile.goalWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
+                        _InfoItem(label: 'IMC', value: profile.bmi != null ? '${profile.bmi!.toStringAsFixed(1)} (${profile.bmiCategory})' : 'Não informado'),
                         _InfoItem(
-                          label: 'Variação',
-                          value: profile.weightDelta! < 0 ? '▼ ${profile.weightDelta!.abs().toStringAsFixed(1)} kg' : '▲ ${profile.weightDelta!.toStringAsFixed(1)} kg',
+                          label: 'Cintura',
+                          value: profile.waistCm != null
+                              ? '${profile.waistCm!.toStringAsFixed(0)} cm${profile.waistRisk != null ? ' (${profile.waistRisk})' : ''}'
+                              : 'Não informado',
                         ),
-                      _InfoItem(label: 'Meta', value: profile.goalWeightKg != null ? '${profile.goalWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
-                      _InfoItem(label: 'IMC', value: profile.bmi != null ? '${profile.bmi!.toStringAsFixed(1)} (${profile.bmiCategory})' : 'Não informado'),
-                      _InfoItem(
-                        label: 'Cintura',
-                        value: profile.waistCm != null
-                            ? '${profile.waistCm!.toStringAsFixed(0)} cm${profile.waistRisk != null ? ' (${profile.waistRisk})' : ''}'
-                            : 'Não informado',
-                      ),
-                      _InfoItem(label: 'Objetivo', value: profile.goal != null ? '${profile.goal!.icon} ${profile.goal!.label}' : 'Não informado'),
-                      _InfoItem(label: 'Atividade', value: profile.activityLevel?.label ?? 'Não informado'),
-                    ],
+                        _InfoItem(label: 'Objetivo', value: profile.goal != null ? '${profile.goal!.icon} ${profile.goal!.label}' : 'Não informado'),
+                        _InfoItem(label: 'Atividade', value: profile.activityLevel?.label ?? 'Não informado'),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              
-              FadeTransition(
-                opacity: _card3Fade,
-                child: SlideTransition(
-                  position: _card3Slide,
-                  child: _InfoCard(
-                    icon: Icons.health_and_safety_outlined,
-                    title: 'Restrições e alergias',
-                    items: [
-                      _InfoItem(label: 'Restrições', value: profile.foodRestrictions.isEmpty ? 'Nenhuma' : profile.foodRestrictions.join(', ')),
-                      _InfoItem(label: 'Alergias', value: profile.allergies.isEmpty ? 'Nenhuma' : profile.allergies.join(', ')),
-                    ],
+                const SizedBox(height: 16),
+                
+                FadeTransition(
+                  opacity: _card3Fade,
+                  child: SlideTransition(
+                    position: _card3Slide,
+                    child: _InfoCard(
+                      icon: Icons.health_and_safety_outlined,
+                      title: 'Restrições e alergias',
+                      items: [
+                        _InfoItem(label: 'Restrições', value: profile.foodRestrictions.isEmpty ? 'Nenhuma' : profile.foodRestrictions.join(', ')),
+                        _InfoItem(label: 'Alergias', value: profile.allergies.isEmpty ? 'Nenhuma' : profile.allergies.join(', ')),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 32),
-              
-              FadeTransition(
-                opacity: _buttonFade,
-                child: SlideTransition(
-                  position: _buttonSlide,
-                  child: ElevatedButton.icon(
-                   onPressed: () async {
-  await Navigator.pushNamed(context, AppRoutes.editProfile);
-  _loadProfile(); // Recarrega ao voltar
-},
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Editar perfil'),
+                const SizedBox(height: 32),
+                
+                FadeTransition(
+                  opacity: _buttonFade,
+                  child: SlideTransition(
+                    position: _buttonSlide,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await Navigator.pushNamed(context, AppRoutes.editProfile);
+                        _loadProfile(); // ⚠️ Recarrega do banco ao voltar
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Editar perfil'),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
