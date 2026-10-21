@@ -5,18 +5,17 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
 import '../../../models/symptom_report.dart';
-import '../../../services/local_storage_service.dart';
+import '../../../models/weight_entry.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/evolution_card.dart';
 import '../../../widgets/greeting_header.dart';
 import '../../../widgets/meals_today_card.dart';
 import '../../../widgets/next_meal_card.dart';
 import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart';
-import '../../../widgets/nf_loading.dart';
-import '../../../services/auth_service.dart';
 
 /// ============================================
-/// TELA: DASHBOARD DO PACIENTE
+/// TELA: DASHBOARD DO PACIENTE (Integrado ao Supabase)
 /// ============================================
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -32,11 +31,14 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
   int _currentNavIndex = 0;
 
-  final _storage = LocalStorageService();
+  final _authService = AuthService();
   
   PatientProfile? _profile;
   int _mealsTodayCount = 0;
   SymptomReport? _latestSymptom;
+  double? _currentWeight;
+  double? _initialWeight;
+  double? _goalWeight;
   bool _isLoading = true;
 
   @override
@@ -62,35 +64,46 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     super.dispose();
   }
 
-   Future<void> _loadData() async {
+  Future<void> _loadData() async {
     try {
-      // 1. Tenta buscar o perfil no Supabase
-      final authService = AuthService();
-      final cloudProfile = await authService.getPatientProfile();
+      // 1. Busca o perfil do paciente (nome, e-mail)
+      final cloudProfile = await _authService.getPatientProfile();
+
+      // 2. Busca as refeições de hoje no Supabase
+      final mealsToday = await _authService.getMealsFromCloud(date: DateTime.now());
+
+      // 3. Busca os pesos no Supabase
+      final weights = await _authService.getWeightsFromCloud();
+
+      // 4. Busca os sintomas (ainda local por enquanto)
+      // TODO: Migrar sintomas para o Supabase
       
-      // ⚠️ PRINT PARA VER SE O SUPABASE RETORNOU ALGO
-      print('DADOS DO SUPABASE: $cloudProfile');
-
-      // 2. Carrega os dados locais (refeições, sintomas, etc)
-      final mealsToday = await _storage.loadMealsByDate(DateTime.now());
-      final latestSymptom = await _storage.loadLatestSymptomReport();
-      final localProfile = await _storage.loadProfile();
-
       if (!mounted) return;
 
       setState(() {
-        // 3. Se achou no Supabase, usa os dados da nuvem. Senão, usa o local (ou mock).
         if (cloudProfile != null) {
-          _profile = (localProfile ?? PatientProfile.mock()).copyWith(
+          _profile = PatientProfile.mock().copyWith(
             name: cloudProfile['name'] as String?,
             email: cloudProfile['email'] as String?,
           );
         } else {
-          _profile = localProfile ?? PatientProfile.mock();
+          _profile = PatientProfile.mock();
         }
 
         _mealsTodayCount = mealsToday.length;
-        _latestSymptom = latestSymptom;
+
+        if (weights.isNotEmpty) {
+          final sorted = List<WeightEntry>.from(weights)..sort((a, b) => a.date.compareTo(b.date));
+          _initialWeight = sorted.first.weightKg;
+          _currentWeight = sorted.last.weightKg;
+        } else {
+          _initialWeight = null;
+          _currentWeight = null;
+        }
+
+        // Mantém a meta padrão por enquanto
+        _goalWeight = 65.0;
+
         _isLoading = false;
       });
     } catch (e) {
@@ -124,8 +137,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     if (_isLoading || _profile == null) {
       return Scaffold(
         backgroundColor: AppColors.background,
-                body: const NFLoading(message: 'Buscando seu progresso...'),
-      
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
@@ -157,10 +171,11 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 28),
 
+                // ⚠️ CARD DE EVOLUÇÃO COM OS DADOS REAIS
                 EvolutionCard(
-                  currentWeight: profile.currentWeightKg ?? 0,
-                  initialWeight: profile.initialWeightKg,
-                  goalWeight: profile.goalWeightKg,
+                  currentWeight: _currentWeight ?? 0,
+                  initialWeight: _initialWeight,
+                  goalWeight: _goalWeight,
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.evolution);
                     if (mounted) _loadData();
@@ -169,6 +184,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
+                // ⚠️ CARD DE REFEIÇÕES COM OS DADOS REAIS
                 MealsTodayCard(
                   registered: _mealsTodayCount,
                   total: 5,
@@ -193,17 +209,14 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                 const NextMealCard(
                   mealName: 'Almoço',
                   mealTime: '12:30',
-                  description:
-                      'Frango grelhado, arroz integral, salada verde e azeite',
+                  description: 'Frango grelhado, arroz integral, salada verde e azeite',
                   icon: Icons.lunch_dining_outlined,
                   color: AppColors.secondary,
                 ),
 
                 const SizedBox(height: 16),
 
-                // ============================================
-                // ATALHO PARA O CHAT
-                // ============================================
+                // Atalho para o Chat
                 InkWell(
                   onTap: () {
                     Navigator.pushNamed(context, AppRoutes.patientChat);

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/meal.dart';
+import '../models/weight_entry.dart';
 
 /// ============================================
 /// SERVIÇO DE AUTENTICAÇÃO E DADOS NA NUVEM
@@ -83,7 +84,7 @@ class AuthService {
   }
 
   // ============================================
-  // BUSCAR PERFIL DO PACIENTE
+  // PERFIL DO PACIENTE
   // ============================================
   Future<Map<String, dynamic>?> getPatientProfile() async {
     try {
@@ -140,7 +141,7 @@ class AuthService {
       }).toList();
 
       await _supabase.from('meal_entries').insert({
-        'patient_id': user.id, // Usa o user.id para o RLS funcionar
+        'patient_id': user.id,
         'type': meal.type.name,
         'date_time': meal.dateTime.toIso8601String(),
         'notes': meal.notes,
@@ -200,6 +201,70 @@ class AuthService {
       return meals;
     } catch (e) {
       print('Erro ao buscar refeições no Supabase: $e');
+      return [];
+    }
+  }
+
+  // ============================================
+  // PESOS
+  // ============================================
+  Future<String?> saveWeightToCloud(WeightEntry entry) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      // Remove o peso do mesmo dia para não duplicar
+      final today = DateTime(entry.date.year, entry.date.month, entry.date.day);
+      final startOfDay = today.toIso8601String();
+      final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59).toIso8601String();
+
+      await _supabase
+          .from('weight_entries')
+          .delete()
+          .eq('patient_id', user.id)
+          .gte('date', startOfDay)
+          .lte('date', endOfDay);
+
+      // Insere o novo
+      await _supabase.from('weight_entries').insert({
+        'patient_id': user.id,
+        'date': entry.date.toIso8601String(),
+        'weight_kg': entry.weightKg,
+        'notes': entry.notes,
+      });
+
+      return null;
+    } catch (e) {
+      print('Erro ao salvar peso no Supabase: $e');
+      return 'Erro ao salvar peso: $e';
+    }
+  }
+
+  Future<List<WeightEntry>> getWeightsFromCloud() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return [];
+
+      final response = await _supabase
+          .from('weight_entries')
+          .select()
+          .eq('patient_id', user.id)
+          .order('date', ascending: true);
+
+      final List<WeightEntry> entries = [];
+      
+      for (final row in response) {
+        entries.add(WeightEntry(
+          id: row['id'] as String,
+          date: DateTime.parse(row['date'] as String),
+          weightKg: (row['weight_kg'] as num).toDouble(),
+          notes: row['notes'] as String?,
+        ));
+      }
+
+      return entries;
+    } catch (e) {
+      print('Erro ao buscar pesos no Supabase: $e');
       return [];
     }
   }
