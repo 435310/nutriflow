@@ -4,10 +4,10 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/symptom_report.dart';
-import '../../../services/local_storage_service.dart';
+import '../../../services/auth_service.dart';
 
 /// ============================================
-/// TELA: RELATAR SINTOMAS
+/// TELA: RELATAR SINTOMAS (Supabase)
 /// ============================================
 class ReportSymptomsPage extends StatefulWidget {
   const ReportSymptomsPage({super.key});
@@ -18,9 +18,8 @@ class ReportSymptomsPage extends StatefulWidget {
 
 class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
   final _notesController = TextEditingController();
-  final _storage = LocalStorageService();
+  final _authService = AuthService();
 
-  // Opções selecionadas
   final Set<String> _selectedSymptoms = {};
   final Set<String> _selectedDifficulties = {};
 
@@ -32,9 +31,6 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
     super.dispose();
   }
 
-  // ============================================
-  // SALVAR
-  // ============================================
   Future<void> _handleSave() async {
     if (_selectedSymptoms.isEmpty &&
         _selectedDifficulties.isEmpty &&
@@ -56,18 +52,15 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
       date: DateTime.now(),
       symptoms: _selectedSymptoms.toList(),
       difficulties: _selectedDifficulties.toList(),
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
+      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
     );
 
-    final success = await _storage.saveSymptomReport(report);
+    final error = await _authService.saveSymptomToCloud(report);
 
     if (!mounted) return;
-
     setState(() => _isSaving = false);
 
-    if (success) {
+    if (error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Relato salvo com sucesso!'),
@@ -75,16 +68,15 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
           duration: Duration(seconds: 2),
         ),
       );
-
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (mounted) AppRoutes.back(context);
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao salvar relato. Tente novamente.'),
+        SnackBar(
+          content: Text(error),
           backgroundColor: AppColors.error,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -106,23 +98,10 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ============================================
-              // SINTOMAS
-              // ============================================
-              const _SectionTitle(
-                icon: Icons.monitor_heart_outlined,
-                title: 'Você sentiu algum sintoma?',
-              ),
-
+              const _SectionTitle(icon: Icons.monitor_heart_outlined, title: 'Você sentiu algum sintoma?'),
               const SizedBox(height: 12),
-
-              const Text(
-                'Marque os que se aplicam:',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-              ),
-
+              const Text('Marque os que se aplicam:', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               const SizedBox(height: 12),
-
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -144,26 +123,11 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
                   );
                 }).toList(),
               ),
-
               const SizedBox(height: 32),
-
-              // ============================================
-              // DIFICULDADES
-              // ============================================
-              const _SectionTitle(
-                icon: Icons.psychology_outlined,
-                title: 'Teve alguma dificuldade?',
-              ),
-
+              const _SectionTitle(icon: Icons.psychology_outlined, title: 'Teve alguma dificuldade?'),
               const SizedBox(height: 12),
-
-              const Text(
-                'Marque as que se aplicam:',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-              ),
-
+              const Text('Marque as que se aplicam:', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               const SizedBox(height: 12),
-
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -185,56 +149,28 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
                   );
                 }).toList(),
               ),
-
               const SizedBox(height: 32),
-
-              // ============================================
-              // OBSERVAÇÕES
-              // ============================================
-              const _SectionTitle(
-                icon: Icons.notes_outlined,
-                title: 'Observações (opcional)',
-              ),
-
+              const _SectionTitle(icon: Icons.notes_outlined, title: 'Observações (opcional)'),
               const SizedBox(height: 12),
-
               TextField(
                 controller: _notesController,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  hintText:
-                      'Como você se sentiu hoje? Algo para contar ao nutricionista?',
-                ),
+                decoration: const InputDecoration(hintText: 'Como você se sentiu hoje? Algo para contar ao nutricionista?'),
               ),
-
               const SizedBox(height: 32),
-
-              // ============================================
-              // BOTÕES
-              // ============================================
               ElevatedButton.icon(
                 onPressed: _isSaving ? null : _handleSave,
                 icon: _isSaving
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.check),
                 label: Text(_isSaving ? 'Salvando...' : 'Salvar relato'),
               ),
-
               const SizedBox(height: 12),
-
               OutlinedButton(
                 onPressed: _isSaving ? null : () => AppRoutes.back(context),
                 child: const Text('Cancelar'),
               ),
-
               const SizedBox(height: 24),
             ],
           ),
@@ -244,21 +180,13 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
   }
 }
 
-// ============================================
-// WIDGET: CHIP DE OPÇÃO
-// ============================================
 class _OptionChip extends StatelessWidget {
   final String label;
   final bool isSelected;
   final Color color;
   final VoidCallback onTap;
 
-  const _OptionChip({
-    required this.label,
-    required this.isSelected,
-    required this.color,
-    required this.onTap,
-  });
+  const _OptionChip({required this.label, required this.isSelected, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -271,10 +199,7 @@ class _OptionChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected ? color.withValues(alpha: 0.15) : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color : AppColors.border,
-            width: isSelected ? 2 : 1,
-          ),
+          border: Border.all(color: isSelected ? color : AppColors.border, width: isSelected ? 2 : 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -298,29 +223,18 @@ class _OptionChip extends StatelessWidget {
   }
 }
 
-// ============================================
-// WIDGET: TÍTULO DE SEÇÃO
-// ============================================
 class _SectionTitle extends StatelessWidget {
   final IconData icon;
   final String title;
-
-  const _SectionTitle({
-    required this.icon,
-    required this.title,
-  });
+  const _SectionTitle({required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Container(
-          height: 36,
-          width: 36,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
+          height: 36, width: 36,
+          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
           child: Icon(icon, color: AppColors.primary, size: 20),
         ),
         const SizedBox(width: 12),

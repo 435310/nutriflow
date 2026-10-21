@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/meal.dart';
+import '../models/symptom_report.dart';
 import '../models/weight_entry.dart';
 
 /// ============================================
@@ -84,7 +85,7 @@ class AuthService {
   }
 
   // ============================================
-  // PERFIL DO PACIENTE (Logado)
+  // PERFIL DO PACIENTE
   // ============================================
   Future<Map<String, dynamic>?> getPatientProfile() async {
     try {
@@ -162,7 +163,6 @@ class AuthService {
       if (user == null) return [];
 
       final targetDate = date ?? DateTime.now();
-      
       final startOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day).toIso8601String();
       final endOfDay = DateTime(targetDate.year, targetDate.month, targetDate.day, 23, 59, 59).toIso8601String();
 
@@ -175,7 +175,6 @@ class AuthService {
           .order('date_time', ascending: true);
 
       final List<Meal> meals = [];
-      
       for (final row in response) {
         final foodsList = (row['foods'] as List<dynamic>?) ?? [];
         final foods = foodsList.map((f) => FoodItem(
@@ -187,17 +186,13 @@ class AuthService {
 
         meals.add(Meal(
           id: row['id'] as String,
-          type: MealType.values.firstWhere(
-            (t) => t.name == row['type'],
-            orElse: () => MealType.lunch,
-          ),
+          type: MealType.values.firstWhere((t) => t.name == row['type'], orElse: () => MealType.lunch),
           dateTime: DateTime.parse(row['date_time'] as String),
           foods: foods,
           notes: row['notes'] as String?,
           photoPath: row['photo_path'] as String?,
         ));
       }
-
       return meals;
     } catch (e) {
       print('Erro ao buscar refeições no Supabase: $e');
@@ -250,7 +245,6 @@ class AuthService {
           .order('date', ascending: true);
 
       final List<WeightEntry> entries = [];
-      
       for (final row in response) {
         entries.add(WeightEntry(
           id: row['id'] as String,
@@ -259,7 +253,6 @@ class AuthService {
           notes: row['notes'] as String?,
         ));
       }
-
       return entries;
     } catch (e) {
       print('Erro ao buscar pesos no Supabase: $e');
@@ -268,7 +261,83 @@ class AuthService {
   }
 
   // ============================================
-  // NUTRICIONISTA: LISTAR PACIENTES
+  // SINTOMAS
+  // ============================================
+  Future<String?> saveSymptomToCloud(SymptomReport report) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      await _supabase.from('symptom_reports').insert({
+        'patient_id': user.id,
+        'date': report.date.toIso8601String(),
+        'symptoms': report.symptoms,
+        'difficulties': report.difficulties,
+        'notes': report.notes,
+      });
+
+      return null;
+    } catch (e) {
+      print('Erro ao salvar sintomas no Supabase: $e');
+      return 'Erro ao salvar sintomas: $e';
+    }
+  }
+
+  Future<SymptomReport?> getLatestSymptomFromCloud() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return null;
+
+      final response = await _supabase
+          .from('symptom_reports')
+          .select()
+          .eq('patient_id', user.id)
+          .order('date', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return SymptomReport(
+        id: response['id'] as String,
+        date: DateTime.parse(response['date'] as String),
+        symptoms: (response['symptoms'] as List<dynamic>?)?.cast<String>() ?? [],
+        difficulties: (response['difficulties'] as List<dynamic>?)?.cast<String>() ?? [],
+        notes: response['notes'] as String?,
+      );
+    } catch (e) {
+      print('Erro ao buscar sintomas no Supabase: $e');
+      return null;
+    }
+  }
+
+  Future<List<SymptomReport>> getPatientSymptoms(String userId) async {
+    try {
+      final response = await _supabase
+          .from('symptom_reports')
+          .select()
+          .eq('patient_id', userId)
+          .order('date', ascending: false);
+
+      final List<SymptomReport> reports = [];
+      for (final row in response) {
+        reports.add(SymptomReport(
+          id: row['id'] as String,
+          date: DateTime.parse(row['date'] as String),
+          symptoms: (row['symptoms'] as List<dynamic>?)?.cast<String>() ?? [],
+          difficulties: (row['difficulties'] as List<dynamic>?)?.cast<String>() ?? [],
+          notes: row['notes'] as String?,
+        ));
+      }
+      return reports;
+    } catch (e) {
+      print('Erro ao buscar sintomas do paciente: $e');
+      return [];
+    }
+  }
+
+  // ============================================
+  // NUTRICIONISTA: LISTAR PACIENTES E DADOS
   // ============================================
   Future<List<Map<String, dynamic>>> getAllPatients() async {
     try {
@@ -283,9 +352,6 @@ class AuthService {
     }
   }
 
-  // ============================================
-  // NUTRICIONISTA: DADOS DE UM PACIENTE ESPECÍFICO
-  // ============================================
   Future<List<Meal>> getPatientMeals(String userId) async {
     try {
       final response = await _supabase

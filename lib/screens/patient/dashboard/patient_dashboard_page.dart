@@ -15,7 +15,7 @@ import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart';
 
 /// ============================================
-/// TELA: DASHBOARD DO PACIENTE (Integrado ao Supabase)
+/// TELA: DASHBOARD DO PACIENTE (Nuvem)
 /// ============================================
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -30,7 +30,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   late Animation<double> _fadeIn;
 
   int _currentNavIndex = 0;
-
   final _authService = AuthService();
   
   PatientProfile? _profile;
@@ -44,16 +43,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   @override
   void initState() {
     super.initState();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _controller.forward();
     _loadData();
   }
@@ -66,18 +57,11 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
   Future<void> _loadData() async {
     try {
-      // 1. Busca o perfil do paciente (nome, e-mail)
       final cloudProfile = await _authService.getPatientProfile();
-
-      // 2. Busca as refeições de hoje no Supabase
       final mealsToday = await _authService.getMealsFromCloud(date: DateTime.now());
-
-      // 3. Busca os pesos no Supabase
       final weights = await _authService.getWeightsFromCloud();
+      final latestSymptom = await _authService.getLatestSymptomFromCloud();
 
-      // 4. Busca os sintomas (ainda local por enquanto)
-      // TODO: Migrar sintomas para o Supabase
-      
       if (!mounted) return;
 
       setState(() {
@@ -91,6 +75,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
         }
 
         _mealsTodayCount = mealsToday.length;
+        _latestSymptom = latestSymptom;
 
         if (weights.isNotEmpty) {
           final sorted = List<WeightEntry>.from(weights)..sort((a, b) => a.date.compareTo(b.date));
@@ -100,8 +85,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
           _initialWeight = null;
           _currentWeight = null;
         }
-
-        // Mantém a meta padrão por enquanto
         _goalWeight = 65.0;
 
         _isLoading = false;
@@ -117,10 +100,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   }
 
   Future<void> _handleNavTap(int index) async {
-    setState(() {
-      _currentNavIndex = index;
-    });
-
+    setState(() => _currentNavIndex = index);
     if (index == 1) {
       await Navigator.pushNamed(context, AppRoutes.diary);
     } else if (index == 2) {
@@ -128,7 +108,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     } else if (index == 3) {
       await Navigator.pushNamed(context, AppRoutes.profile);
     }
-
     if (mounted) _loadData();
   }
 
@@ -137,9 +116,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     if (_isLoading || _profile == null) {
       return Scaffold(
         backgroundColor: AppColors.background,
-        body: const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
@@ -160,18 +137,10 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                   name: profile.name,
                   notificationCount: 2,
                   onNotificationTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Notificações em breve'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Notificações em breve')));
                   },
                 ),
-
                 const SizedBox(height: 28),
-
-                // ⚠️ CARD DE EVOLUÇÃO COM OS DADOS REAIS
                 EvolutionCard(
                   currentWeight: _currentWeight ?? 0,
                   initialWeight: _initialWeight,
@@ -181,10 +150,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                     if (mounted) _loadData();
                   },
                 ),
-
                 const SizedBox(height: 16),
-
-                // ⚠️ CARD DE REFEIÇÕES COM OS DADOS REAIS
                 MealsTodayCard(
                   registered: _mealsTodayCount,
                   total: 5,
@@ -193,9 +159,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                     if (mounted) _loadData();
                   },
                 ),
-
                 const SizedBox(height: 16),
-
                 SymptomCard(
                   latestReport: _latestSymptom,
                   onTap: () async {
@@ -203,9 +167,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                     if (mounted) _loadData();
                   },
                 ),
-
                 const SizedBox(height: 16),
-
                 const NextMealCard(
                   mealName: 'Almoço',
                   mealTime: '12:30',
@@ -213,14 +175,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                   icon: Icons.lunch_dining_outlined,
                   color: AppColors.secondary,
                 ),
-
                 const SizedBox(height: 16),
-
-                // Atalho para o Chat
                 InkWell(
-                  onTap: () {
-                    Navigator.pushNamed(context, AppRoutes.patientChat);
-                  },
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.patientChat),
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     padding: const EdgeInsets.all(20),
@@ -228,60 +185,33 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: AppColors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          height: 40,
-                          width: 40,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.chat_bubble_outline,
-                            color: AppColors.secondary,
-                            size: 22,
-                          ),
+                          height: 40, width: 40,
+                          decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.chat_bubble_outline, color: AppColors.secondary, size: 22),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Falar com a Nutricionista',
-                                style: AppTextStyles.h3.copyWith(fontSize: 16),
-                              ),
+                              Text('Falar com a Nutricionista', style: AppTextStyles.h3.copyWith(fontSize: 16)),
                               const SizedBox(height: 2),
-                              Text(
-                                'Tire dúvidas sobre o seu plano',
-                                style: AppTextStyles.caption,
-                              ),
+                              Text('Tire dúvidas sobre o seu plano', style: AppTextStyles.caption),
                             ],
                           ),
                         ),
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
                       ],
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
                 const _TipsSection(),
-
                 const SizedBox(height: 100),
               ],
             ),
@@ -321,40 +251,22 @@ class _TipsSection extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary.withValues(alpha: 0.1),
-                AppColors.secondary.withValues(alpha: 0.1),
-              ],
-            ),
+            gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.1), AppColors.secondary.withValues(alpha: 0.1)]),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.2),
-            ),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
           ),
           child: Row(
             children: [
               Container(
-                height: 44,
-                width: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text('💡', style: TextStyle(fontSize: 22)),
-                ),
+                height: 44, width: 44,
+                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
+                child: const Center(child: Text('💡', style: TextStyle(fontSize: 22))),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'Beba pelo menos 2 litros de água por dia. '
-                  'A hidratação ajuda no funcionamento do metabolismo.',
-                  style: AppTextStyles.bodySecondary.copyWith(
-                    fontSize: 14,
-                    height: 1.4,
-                    color: AppColors.textPrimary,
-                  ),
+                  'Beba pelo menos 2 litros de água por dia. A hidratação ajuda no funcionamento do metabolismo.',
+                  style: AppTextStyles.bodySecondary.copyWith(fontSize: 14, height: 1.4, color: AppColors.textPrimary),
                 ),
               ),
             ],
