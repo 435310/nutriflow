@@ -85,4 +85,25 @@ class AuthService {
   Future<void> signOut() async {
     await _supabase.auth.signOut();
   }
+
+    // ============================================
+  // BUSCAR PERFIL DO PACIENTE NO BANCO
+  // ============================================
+  Future<Map<String, dynamic>?> getPatientProfile() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return null;
+
+      final response = await _supabase
+          .from('patient_profiles')
+          .select()
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      print('Erro ao buscar perfil: $e');
+      return null;
+    }
+  }
 }

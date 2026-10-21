@@ -13,6 +13,7 @@ import '../../../widgets/next_meal_card.dart';
 import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart';
 import '../../../widgets/nf_loading.dart';
+import '../../../services/auth_service.dart';
 
 /// ============================================
 /// TELA: DASHBOARD DO PACIENTE
@@ -61,16 +62,33 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+   Future<void> _loadData() async {
     try {
-      final profile = await _storage.loadProfile();
+      // 1. Tenta buscar o perfil no Supabase
+      final authService = AuthService();
+      final cloudProfile = await authService.getPatientProfile();
+      
+      // ⚠️ PRINT PARA VER SE O SUPABASE RETORNOU ALGO
+      print('DADOS DO SUPABASE: $cloudProfile');
+
+      // 2. Carrega os dados locais (refeições, sintomas, etc)
       final mealsToday = await _storage.loadMealsByDate(DateTime.now());
       final latestSymptom = await _storage.loadLatestSymptomReport();
-      
+      final localProfile = await _storage.loadProfile();
+
       if (!mounted) return;
 
       setState(() {
-        _profile = profile ?? PatientProfile.mock();
+        // 3. Se achou no Supabase, usa os dados da nuvem. Senão, usa o local (ou mock).
+        if (cloudProfile != null) {
+          _profile = (localProfile ?? PatientProfile.mock()).copyWith(
+            name: cloudProfile['name'] as String?,
+            email: cloudProfile['email'] as String?,
+          );
+        } else {
+          _profile = localProfile ?? PatientProfile.mock();
+        }
+
         _mealsTodayCount = mealsToday.length;
         _latestSymptom = latestSymptom;
         _isLoading = false;
