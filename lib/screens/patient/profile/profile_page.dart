@@ -5,6 +5,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
+import '../../../services/auth_service.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../widgets/user_avatar.dart';
 
@@ -35,6 +36,8 @@ class _ProfilePageState extends State<ProfilePage>
   late Animation<Offset> _buttonSlide;
 
   final _storage = LocalStorageService();
+  final _authService = AuthService();
+  
   PatientProfile? _profile;
   bool _isLoading = true;
 
@@ -48,88 +51,37 @@ class _ProfilePageState extends State<ProfilePage>
     );
 
     _avatarFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.3, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.3, curve: Curves.easeOut)),
     );
-
     _nameFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.15, 0.4, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.15, 0.4, curve: Curves.easeOut)),
     );
-
     _emailFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.25, 0.5, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.25, 0.5, curve: Curves.easeOut)),
     );
-
     _card1Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.35, 0.6, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.35, 0.6, curve: Curves.easeOut)),
     );
-    _card1Slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.35, 0.6, curve: Curves.easeOutCubic),
-      ),
+    _card1Slide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.35, 0.6, curve: Curves.easeOutCubic)),
     );
-
     _card2Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.5, 0.75, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.5, 0.75, curve: Curves.easeOut)),
     );
-    _card2Slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.5, 0.75, curve: Curves.easeOutCubic),
-      ),
+    _card2Slide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.5, 0.75, curve: Curves.easeOutCubic)),
     );
-
     _card3Fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.65, 0.85, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.65, 0.85, curve: Curves.easeOut)),
     );
-    _card3Slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.65, 0.85, curve: Curves.easeOutCubic),
-      ),
+    _card3Slide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.65, 0.85, curve: Curves.easeOutCubic)),
     );
-
     _buttonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.8, 1.0, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.8, 1.0, curve: Curves.easeOut)),
     );
-    _buttonSlide = Tween<Offset>(
-      begin: const Offset(0, 0.4),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.8, 1.0, curve: Curves.easeOutCubic),
-      ),
+    _buttonSlide = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: const Interval(0.8, 1.0, curve: Curves.easeOutCubic)),
     );
 
     _controller.forward();
@@ -143,22 +95,32 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   // ============================================
-  // CARREGAR PERFIL
+  // CARREGAR PERFIL DO SUPABASE
   // ============================================
   Future<void> _loadProfile() async {
     try {
-      final profile = await _storage.loadProfile();
+      // 1. Busca do Supabase
+      final cloudProfile = await _authService.getPatientProfile();
+      
+      // 2. Busca do Storage Local (para complementar dados que ainda não estão na nuvem)
+      final localProfile = await _storage.loadProfile();
+
       if (!mounted) return;
 
       setState(() {
-        _profile = profile ?? PatientProfile.mock();
+        final base = localProfile ?? PatientProfile.mock();
+        
+        if (cloudProfile != null) {
+          // Se achou na nuvem, sobrescreve o nome e e-mail com os dados reais
+          _profile = base.copyWith(
+            name: cloudProfile['name'] as String?,
+            email: cloudProfile['email'] as String?,
+          );
+        } else {
+          _profile = base;
+        }
         _isLoading = false;
       });
-
-      // Se não tem perfil salvo, salva o mock como inicial
-      if (profile == null) {
-        await _storage.saveProfile(_profile!);
-      }
     } catch (e) {
       print('Erro ao carregar perfil: $e');
       if (!mounted) return;
@@ -209,9 +171,7 @@ class _ProfilePageState extends State<ProfilePage>
                   size: UserAvatarSize.large,
                 ),
               ),
-
               const SizedBox(height: 20),
-
               FadeTransition(
                 opacity: _nameFade,
                 child: Text(
@@ -220,9 +180,7 @@ class _ProfilePageState extends State<ProfilePage>
                   textAlign: TextAlign.center,
                 ),
               ),
-
               const SizedBox(height: 6),
-
               FadeTransition(
                 opacity: _emailFade,
                 child: Text(
@@ -231,9 +189,8 @@ class _ProfilePageState extends State<ProfilePage>
                   textAlign: TextAlign.center,
                 ),
               ),
-
               const SizedBox(height: 32),
-
+              
               FadeTransition(
                 opacity: _card1Fade,
                 child: SlideTransition(
@@ -242,27 +199,15 @@ class _ProfilePageState extends State<ProfilePage>
                     icon: Icons.person_outline,
                     title: 'Dados pessoais',
                     items: [
-                      _InfoItem(
-                        label: 'Telefone',
-                        value: profile.phone ?? 'Não informado',
-                      ),
-                      _InfoItem(
-                        label: 'Idade',
-                        value: profile.age != null
-                            ? '${profile.age} anos'
-                            : 'Não informado',
-                      ),
-                      _InfoItem(
-                        label: 'Sexo',
-                        value: profile.gender?.label ?? 'Não informado',
-                      ),
+                      _InfoItem(label: 'Telefone', value: profile.phone ?? 'Não informado'),
+                      _InfoItem(label: 'Idade', value: profile.age != null ? '${profile.age} anos' : 'Não informado'),
+                      _InfoItem(label: 'Sexo', value: profile.gender?.label ?? 'Não informado'),
                     ],
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
+              
               FadeTransition(
                 opacity: _card2Fade,
                 child: SlideTransition(
@@ -271,68 +216,30 @@ class _ProfilePageState extends State<ProfilePage>
                     icon: Icons.monitor_weight_outlined,
                     title: 'Dados clínicos',
                     items: [
-                      _InfoItem(
-                        label: 'Altura',
-                        value: profile.heightCm != null
-                            ? '${(profile.heightCm! / 100).toStringAsFixed(2)} m'
-                            : 'Não informado',
-                      ),
-                      _InfoItem(
-                        label: 'Peso inicial',
-                        value: profile.initialWeightKg != null
-                            ? '${profile.initialWeightKg!.toStringAsFixed(1)} kg'
-                            : 'Não informado',
-                      ),
-                      _InfoItem(
-                        label: 'Peso atual',
-                        value: profile.currentWeightKg != null
-                            ? '${profile.currentWeightKg!.toStringAsFixed(1)} kg'
-                            : 'Não informado',
-                      ),
-                      if (profile.weightDelta != null &&
-                          profile.weightDelta != 0)
+                      _InfoItem(label: 'Altura', value: profile.heightCm != null ? '${(profile.heightCm! / 100).toStringAsFixed(2)} m' : 'Não informado'),
+                      _InfoItem(label: 'Peso inicial', value: profile.initialWeightKg != null ? '${profile.initialWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
+                      _InfoItem(label: 'Peso atual', value: profile.currentWeightKg != null ? '${profile.currentWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
+                      if (profile.weightDelta != null && profile.weightDelta != 0)
                         _InfoItem(
                           label: 'Variação',
-                          value: profile.weightDelta! < 0
-                              ? '▼ ${profile.weightDelta!.abs().toStringAsFixed(1)} kg'
-                              : '▲ ${profile.weightDelta!.toStringAsFixed(1)} kg',
+                          value: profile.weightDelta! < 0 ? '▼ ${profile.weightDelta!.abs().toStringAsFixed(1)} kg' : '▲ ${profile.weightDelta!.toStringAsFixed(1)} kg',
                         ),
-                      _InfoItem(
-                        label: 'Meta',
-                        value: profile.goalWeightKg != null
-                            ? '${profile.goalWeightKg!.toStringAsFixed(1)} kg'
-                            : 'Não informado',
-                      ),
-                      _InfoItem(
-                        label: 'IMC',
-                        value: profile.bmi != null
-                            ? '${profile.bmi!.toStringAsFixed(1)} (${profile.bmiCategory})'
-                            : 'Não informado',
-                      ),
+                      _InfoItem(label: 'Meta', value: profile.goalWeightKg != null ? '${profile.goalWeightKg!.toStringAsFixed(1)} kg' : 'Não informado'),
+                      _InfoItem(label: 'IMC', value: profile.bmi != null ? '${profile.bmi!.toStringAsFixed(1)} (${profile.bmiCategory})' : 'Não informado'),
                       _InfoItem(
                         label: 'Cintura',
                         value: profile.waistCm != null
-                            ? '${profile.waistCm!.toStringAsFixed(0)} cm'
-                                '${profile.waistRisk != null ? ' (${profile.waistRisk})' : ''}'
+                            ? '${profile.waistCm!.toStringAsFixed(0)} cm${profile.waistRisk != null ? ' (${profile.waistRisk})' : ''}'
                             : 'Não informado',
                       ),
-                      _InfoItem(
-                        label: 'Objetivo',
-                        value: profile.goal != null
-                            ? '${profile.goal!.icon} ${profile.goal!.label}'
-                            : 'Não informado',
-                      ),
-                      _InfoItem(
-                        label: 'Atividade',
-                        value: profile.activityLevel?.label ?? 'Não informado',
-                      ),
+                      _InfoItem(label: 'Objetivo', value: profile.goal != null ? '${profile.goal!.icon} ${profile.goal!.label}' : 'Não informado'),
+                      _InfoItem(label: 'Atividade', value: profile.activityLevel?.label ?? 'Não informado'),
                     ],
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
+              
               FadeTransition(
                 opacity: _card3Fade,
                 child: SlideTransition(
@@ -341,34 +248,22 @@ class _ProfilePageState extends State<ProfilePage>
                     icon: Icons.health_and_safety_outlined,
                     title: 'Restrições e alergias',
                     items: [
-                      _InfoItem(
-                        label: 'Restrições',
-                        value: profile.foodRestrictions.isEmpty
-                            ? 'Nenhuma'
-                            : profile.foodRestrictions.join(', '),
-                      ),
-                      _InfoItem(
-                        label: 'Alergias',
-                        value: profile.allergies.isEmpty
-                            ? 'Nenhuma'
-                            : profile.allergies.join(', '),
-                      ),
+                      _InfoItem(label: 'Restrições', value: profile.foodRestrictions.isEmpty ? 'Nenhuma' : profile.foodRestrictions.join(', ')),
+                      _InfoItem(label: 'Alergias', value: profile.allergies.isEmpty ? 'Nenhuma' : profile.allergies.join(', ')),
                     ],
                   ),
                 ),
               ),
-
               const SizedBox(height: 32),
-
+              
               FadeTransition(
                 opacity: _buttonFade,
                 child: SlideTransition(
                   position: _buttonSlide,
                   child: ElevatedButton.icon(
-                   onPressed: () {
-  Navigator.pushNamed(context, AppRoutes.editProfile).then((_) {
-    _loadProfile();
-  });
+                   onPressed: () async {
+  await Navigator.pushNamed(context, AppRoutes.editProfile);
+  _loadProfile(); // Recarrega ao voltar
 },
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Editar perfil'),
