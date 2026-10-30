@@ -188,6 +188,11 @@ class AuthService {
         'calories': f.calories,
       }).toList();
 
+      print('═══════════════════════════════════');
+      print('SALVANDO REFEIÇÃO: ${meal.type.label}');
+      print('ALIMENTOS: $foodsJson');
+      print('═══════════════════════════════════');
+
       await _supabase.from('meal_entries').insert({
         'patient_id': user.id,
         'type': meal.type.name,
@@ -198,8 +203,11 @@ class AuthService {
       });
 
       return null;
-    } catch (e) {
-      print('Erro ao salvar refeição no Supabase: $e');
+    } catch (e, stacktrace) {
+      print('═══════════════════════════════════');
+      print('ERRO AO SALVAR REFEIÇÃO: $e');
+      print('STACKTRACE: $stacktrace');
+      print('═══════════════════════════════════');
       return 'Erro ao salvar refeição: $e';
     }
   }
@@ -493,12 +501,11 @@ class AuthService {
     }
   }
 
-  // ⚠️ GERAR URL TEMPORÁRIA DA FOTO
   Future<String?> getMealPhotoUrl(String path) async {
     try {
       final response = await _supabase.storage
           .from('meal-photos')
-          .createSignedUrl(path, 3600); // 1 hora de validade
+          .createSignedUrl(path, 3600);
       return response;
     } catch (e) {
       print('Erro ao gerar URL da foto: $e');
@@ -597,6 +604,23 @@ class AuthService {
     } catch (e) {
       print('Erro ao buscar anamnese: $e');
       return null;
+    }
+  }
+
+  // ============================================
+  // TACO (BUSCA DE ALIMENTOS)
+  // ============================================
+  Future<List<Map<String, dynamic>>> searchFoods(String query) async {
+    try {
+      final response = await _supabase
+          .from('foods')
+          .select()
+          .ilike('name', '%$query%')
+          .limit(10);
+      return response;
+    } catch (e) {
+      print('Erro ao buscar alimentos: $e');
+      return [];
     }
   }
 

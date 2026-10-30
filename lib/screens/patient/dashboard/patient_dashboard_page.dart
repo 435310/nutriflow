@@ -7,16 +7,17 @@ import '../../../models/patient_profile.dart';
 import '../../../models/symptom_report.dart';
 import '../../../models/weight_entry.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/local_storage_service.dart'; // NOVO IMPORT
+import '../../../screens/patient/meal/register_meal_page.dart'; // NOVO IMPORT
 import '../../../widgets/evolution_card.dart';
 import '../../../widgets/greeting_header.dart';
 import '../../../widgets/meals_today_card.dart';
 import '../../../widgets/next_meal_card.dart';
 import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart';
-// Não precisa importar a FillAnamnesisPage aqui se usar AppRoutes.go
 
 /// ============================================
-/// TELA: DASHBOARD DO PACIENTE (Nuvem)
+/// TELA: DASHBOARD DO PACIENTE
 /// ============================================
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -32,6 +33,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
   int _currentNavIndex = 0;
   final _authService = AuthService();
+  final _localStorage = LocalStorageService(); // Instância do banco local
   
   PatientProfile? _profile;
   int _mealsTodayCount = 0;
@@ -58,10 +60,16 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
   Future<void> _loadData() async {
     try {
+      // Tenta buscar do Supabase
       final cloudProfile = await _authService.getPatientProfile();
-      final mealsToday = await _authService.getMealsFromCloud(date: DateTime.now());
-      final weights = await _authService.getWeightsFromCloud();
-      final latestSymptom = await _authService.getLatestSymptomFromCloud();
+      final cloudMeals = await _authService.getMealsFromCloud(date: DateTime.now());
+      final cloudWeights = await _authService.getWeightsFromCloud();
+      final cloudSymptom = await _authService.getLatestSymptomFromCloud();
+
+      // PLANO B: Busca do armazenamento local se a nuvem falhar ou vier vazio
+      final localMeals = await _localStorage.loadMealsByDate(DateTime.now());
+      final localWeights = await _localStorage.loadWeights();
+      final localSymptom = await _localStorage.loadLatestSymptomReport();
 
       if (!mounted) return;
 
@@ -75,11 +83,16 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
           _profile = PatientProfile.mock();
         }
 
-        _mealsTodayCount = mealsToday.length;
-        _latestSymptom = latestSymptom;
+        // Se a nuvem retornar 0 refeições, usa as do celular
+        _mealsTodayCount = cloudMeals.isNotEmpty ? cloudMeals.length : localMeals.length;
+        
+        // Sintomas
+        _latestSymptom = cloudSymptom ?? localSymptom;
 
-        if (weights.isNotEmpty) {
-          final sorted = List<WeightEntry>.from(weights)..sort((a, b) => a.date.compareTo(b.date));
+        // Pesos
+        final weightsToUse = cloudWeights.isNotEmpty ? cloudWeights : localWeights;
+        if (weightsToUse.isNotEmpty) {
+          final sorted = List<WeightEntry>.from(weightsToUse)..sort((a, b) => a.date.compareTo(b.date));
           _initialWeight = sorted.first.weightKg;
           _currentWeight = sorted.last.weightKg;
         } else {
@@ -110,6 +123,21 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
       await Navigator.pushNamed(context, AppRoutes.profile);
     }
     if (mounted) _loadData();
+  }
+
+  // ============================================
+  // NOVA FUNÇÃO: ABRIR TELA DE REGISTRO DIRETO
+  // ============================================
+  Future<void> _openRegisterMeal() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RegisterMealPage()),
+    );
+
+    // Se salvou, recarrega os dados na tela
+    if (result == true && mounted) {
+      _loadData();
+    }
   }
 
   @override
@@ -177,7 +205,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ⚠️ ATALHO PARA A ANAMNESE
+                // ATALHO PARA A ANAMNESE
                 InkWell(
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.fillAnamnesis);
@@ -323,10 +351,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.pushNamed(context, AppRoutes.registerMeal);
-          if (mounted) _loadData();
-        },
+        onPressed: _openRegisterMeal, // <--- MUDANÇA AQUI: Chama a nova função
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 4,
