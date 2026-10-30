@@ -7,9 +7,11 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
 import '../../../services/auth_service.dart';
-import '../../../services/local_storage_service.dart'; // NOVO IMPORT
+import '../../../core/utils/id_generator.dart';
+import '../../../services/sync_service.dart';
 import '../../../widgets/food_item_field.dart';
 import '../../../widgets/meal_type_selector.dart';
+import '../../../services/food_service.dart';
 
 /// ============================================
 /// TELA: REGISTRAR REFEIÇÃO (com Foto e TACO)
@@ -33,8 +35,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
   Uint8List? _imageBytes;
 
   final _authService = AuthService();
-  final _localStorage = LocalStorageService(); // Instância do banco local
-
+  final _syncService = SyncService();
   @override
   void dispose() {
     _notesController.dispose();
@@ -72,8 +73,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddFoodModal(authService: _authService),
-    );
+      builder: (_) => _AddFoodModal(foodService: FoodService()),    );
 
     if (result != null) {
       setState(() => _foods.add(result));
@@ -109,7 +109,7 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
   // ============================================
   // SALVAR REFEIÇÃO (LOCAL E NUVEM) - CORRIGIDO
   // ============================================
-  Future<void> _handleSave() async {
+    Future<void> _handleSave() async {
     if (_selectedType == null) {
       _showSnackBar('Escolha o tipo de refeição', isError: true);
       return;
@@ -122,22 +122,17 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
 
     setState(() => _isSaving = true);
 
+    // 1. Foto: tenta enviar, mas a refeição é salva mesmo se o envio falhar
     String? photoPath;
-
-    // 1. Tenta enviar a foto (se houver)
+    var photoFailed = false;
     if (_selectedImage != null && _imageBytes != null) {
       photoPath = await _authService.uploadMealPhoto(_imageBytes!, _selectedImage!.name);
-      
-      if (photoPath == null) {
-        setState(() => _isSaving = false);
-        _showSnackBar('Erro ao enviar a foto. Tente novamente.', isError: true);
-        return;
-      }
+      photoFailed = photoPath == null;
     }
 
-    // 2. Monta o objeto da refeição
+    // 2. Monta a refeição com id UUID gerado no aparelho
     final meal = Meal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: IdGenerator.uuid(),
       type: _selectedType!,
       dateTime: _selectedDateTime,
       foods: List.from(_foods),
@@ -145,27 +140,28 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
       photoPath: photoPath,
     );
 
-    // 3. SALVA NO BANCO LOCAL (Garante que não perde os dados)
-    await _localStorage.saveMeal(meal);
-
-    // 4. TENTA SALVAR NA NUVEM (Supabase)
-    final error = await _authService.saveMealToCloud(meal);
+    // 3. Salva no aparelho, entra na fila e tenta enviar
+    final status = await _syncService.saveMeal(meal);
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    // 5. Verifica o resultado e fecha a tela avisando o Dashboard
-    if (error == null) {
-      _showSnackBar('${meal.type.label} salvo com sucesso!');
-    } else {
-      print('AVISO: Salvo no celular, mas erro na nuvem: $error');
-      _showSnackBar('Salvo no celular! (Erro na nuvem)', isError: true);
+    if (status == SyncStatus.localFailed) {
+      _showSnackBar('Não foi possível salvar a refeição. Tente novamente.', isError: true);
+      return;
     }
 
-    // ⚠️ AQUI ESTÁ O SEGREDO: Retorna 'true' para avisar o Dashboard
+    final photoNote = photoFailed ? ' A foto não foi enviada.' : '';
+    if (status == SyncStatus.synced) {
+      _showSnackBar('${meal.type.label} salvo com sucesso!$photoNote');
+    } else {
+      _showSnackBar('Salvo no aparelho! Será enviado quando houver conexão.$photoNote');
+    }
+
+    // Retorna 'true' para avisar o Dashboard
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        Navigator.pop(context, true); // Passa 'true' de volta
+        Navigator.pop(context, true);
       }
     });
   }
@@ -363,9 +359,9 @@ class _SectionTitle extends StatelessWidget {
 // MODAL: BUSCAR ALIMENTOS NA TACO
 // ============================================
 class _AddFoodModal extends StatefulWidget {
-  final AuthService authService;
+    final FoodService foodService;
 
-  const _AddFoodModal({required this.authService});
+  const _AddFoodModal({required this.foodService});
 
   @override
   State<_AddFoodModal> createState() => _AddFoodModalState();
@@ -394,8 +390,7 @@ class _AddFoodModalState extends State<_AddFoodModal> {
     }
 
     setState(() => _isSearching = true);
-    final results = await widget.authService.searchFoods(query);
-    
+    final results = await widget.foodService.search(query);    
     if (mounted) {
       setState(() {
         _searchResults = results;

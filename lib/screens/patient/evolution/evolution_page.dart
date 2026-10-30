@@ -5,13 +5,14 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
 import '../../../models/weight_entry.dart';
-import '../../../services/auth_service.dart';
+import '../../../services/local_storage_service.dart';
+import '../../../services/sync_service.dart';
 import '../../../widgets/stats_card.dart';
 import '../../../widgets/weight_chart.dart';
 import '../../../widgets/weight_history_item.dart';
 
 /// ============================================
-/// TELA: EVOLUÇÃO (Integrada ao Supabase)
+/// TELA: EVOLUÇÃO (Offline-First)
 /// ============================================
 class EvolutionPage extends StatefulWidget {
   const EvolutionPage({super.key});
@@ -25,8 +26,10 @@ class _EvolutionPageState extends State<EvolutionPage>
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
-  final PatientProfile _profile = PatientProfile.mock();
-  final _authService = AuthService();
+  PatientProfile _profile = PatientProfile.mock();
+  final _localStorage = LocalStorageService();
+  final _syncService = SyncService();
+  bool _isSyncing = false;
 
   List<WeightEntry> _entries = [];
   bool _isLoading = true;
@@ -48,16 +51,26 @@ class _EvolutionPageState extends State<EvolutionPage>
     super.dispose();
   }
 
+  // ============================================
+  // CARREGAR PESOS (local na hora, nuvem em segundo plano)
+  // ============================================
   Future<void> _loadEntries() async {
+    await _loadFromLocal();
+    _syncInBackground();
+  }
+
+  Future<void> _loadFromLocal() async {
     try {
-      final entries = await _authService.getWeightsFromCloud();
+      final entries = await _localStorage.loadWeights();
+      final localProfile = await _localStorage.loadProfile();
       if (!mounted) return;
       setState(() {
-        _entries = entries ?? [];
+        _entries = entries;
+        if (localProfile != null) _profile = localProfile;
         _isLoading = false;
       });
     } catch (e) {
-      print('Erro ao carregar pesos: $e');
+      debugPrint('Erro ao carregar pesos: $e');
       if (!mounted) return;
       setState(() {
         _entries = [];
@@ -66,10 +79,63 @@ class _EvolutionPageState extends State<EvolutionPage>
     }
   }
 
-  void _handleDelete(WeightEntry entry) {
-    // Implementação futura
+  Future<void> _syncInBackground() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    try {
+      await _syncService.syncAll();
+      if (!mounted) return;
+      await _loadFromLocal();
+    } catch (e) {
+      debugPrint('Erro ao sincronizar pesos: $e');
+    } finally {
+      _isSyncing = false;
+    }
   }
 
+  // ============================================
+  // EXCLUIR PESO
+  // ============================================
+  void _handleDelete(WeightEntry entry) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir registro?'),
+        content: Text('Deseja realmente excluir o peso de ${entry.formattedDate}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final status = await _syncService.deleteWeight(entry.id);
+              if (!mounted) return;
+              await _loadFromLocal();
+              if (!mounted) return;
+
+              if (status == SyncStatus.localFailed) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Não foi possível excluir o registro.'),
+                    backgroundColor: AppColors.error,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================
+  // GETTERS DE ESTATÍSTICAS
+  // ============================================
   WeightEntry? get _latest {
     if (_entries.isEmpty) return null;
     final sorted = List<WeightEntry>.from(_entries)..sort((a, b) => b.date.compareTo(a.date));
@@ -172,7 +238,7 @@ class _EvolutionPageState extends State<EvolutionPage>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.pushNamed(context, AppRoutes.registerWeight);
-          _loadEntries();
+          _loadEntries(); // Atualiza a tela ao voltar do registro
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

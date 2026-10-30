@@ -4,10 +4,11 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/weight_entry.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/utils/id_generator.dart'; // IMPORT ADICIONADO
+import '../../../services/sync_service.dart'; // IMPORT ADICIONADO (E AuthService REMOVIDO)
 
 /// ============================================
-/// TELA: REGISTRAR PESO (Integrada ao Supabase)
+/// TELA: REGISTRAR PESO (Offline-First)
 /// ============================================
 class RegisterWeightPage extends StatefulWidget {
   const RegisterWeightPage({super.key});
@@ -20,6 +21,7 @@ class _RegisterWeightPageState extends State<RegisterWeightPage> {
   final _formKey = GlobalKey<FormState>();
   final _weightController = TextEditingController();
   final _notesController = TextEditingController();
+  final _syncService = SyncService();
 
   DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
@@ -66,32 +68,40 @@ class _RegisterWeightPageState extends State<RegisterWeightPage> {
     try {
       final weightValue = double.parse(_weightController.text.replaceAll(',', '.'));
 
+      // ⚠️ BLOCO CORRIGIDO E SUBSTITUÍDO AQUI
       final entry = WeightEntry(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: IdGenerator.uuid(), // ID único universal
         date: _selectedDate,
         weightKg: weightValue,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
 
-      final error = await AuthService().saveWeightToCloud(entry);
+      // Salva usando o SyncService (que cuida do local e da nuvem)
+      final status = await _syncService.saveWeight(entry);
 
       if (!mounted) return;
 
-      if (error == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Peso registrado: ${weightValue.toStringAsFixed(1)} kg'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) AppRoutes.back(context);
-        });
-      } else {
-        _showError(error);
+      if (status == SyncStatus.localFailed) {
+        _showError('Não foi possível salvar o peso. Tente novamente.');
+        return;
       }
+
+      // Se salvou local mas não na nuvem, avisa o usuário
+      final suffix = status == SyncStatus.pending ? ' (será enviado quando houver conexão)' : '';
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Peso registrado: ${weightValue.toStringAsFixed(1)} kg$suffix'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) AppRoutes.back(context);
+      });
+      // ⚠️ FIM DO BLOCO SUBSTITUÍDO
+
     } catch (e) {
       _showError('Erro: $e');
     } finally {

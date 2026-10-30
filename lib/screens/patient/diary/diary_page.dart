@@ -4,11 +4,13 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/meal.dart';
-import '../../../services/auth_service.dart';
+import '../../../services/auth_service.dart'; // ADICIONADO
+import '../../../services/local_storage_service.dart';
+import '../../../services/sync_service.dart';
 import '../../../widgets/meal_card.dart';
 
 /// ============================================
-/// TELA: DIÁRIO ALIMENTAR (Integrado ao Supabase)
+/// TELA: DIÁRIO ALIMENTAR (Offline-First)
 /// ============================================
 class DiaryPage extends StatefulWidget {
   const DiaryPage({super.key});
@@ -22,7 +24,11 @@ class _DiaryPageState extends State<DiaryPage>
   late AnimationController _controller;
   late Animation<double> _fadeIn;
 
-  final _authService = AuthService();
+  final _authService = AuthService(); // ADICIONADO (estava faltando no original)
+  final _localStorage = LocalStorageService();
+  final _syncService = SyncService();
+  
+  bool _isSyncing = false;
   List<Meal> _meals = [];
   bool _isLoading = true;
 
@@ -50,26 +56,42 @@ class _DiaryPageState extends State<DiaryPage>
   }
 
   // ============================================
-  // CARREGAR REFEIÇÕES DO SUPABASE
+  // CARREGAR REFEIÇÕES (local na hora, nuvem em segundo plano)
   // ============================================
   Future<void> _loadMeals() async {
+    await _loadFromLocal();
+    _syncInBackground();
+  }
+
+  Future<void> _loadFromLocal() async {
     try {
-      // Busca as refeições de hoje direto da nuvem
-      final meals = await _authService.getMealsFromCloud(date: DateTime.now());
-      
+      final meals = await _localStorage.loadMealsByDate(DateTime.now());
       if (!mounted) return;
-      
       setState(() {
         _meals = meals;
         _isLoading = false;
       });
     } catch (e) {
-      print('Erro ao carregar refeições: $e');
+      debugPrint('Erro ao carregar refeições locais: $e');
       if (!mounted) return;
       setState(() {
         _meals = [];
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _syncInBackground() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    try {
+      await _syncService.syncAll();
+      if (!mounted) return;
+      await _loadFromLocal(); // Atualiza a tela depois de sincronizar
+    } catch (e) {
+      debugPrint('Erro ao sincronizar diário: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -89,7 +111,7 @@ class _DiaryPageState extends State<DiaryPage>
           ),
           TextButton(
             onPressed: () async {
-              // TODO: Implementar delete no Supabase
+              // TODO: Implementar delete no Supabase (via SyncService)
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -156,7 +178,7 @@ class _DiaryPageState extends State<DiaryPage>
                 Text(_formatDate(), style: AppTextStyles.h2),
                 const SizedBox(height: 20),
 
-                // Card total do dia (simplificado)
+                // Card total do dia
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),

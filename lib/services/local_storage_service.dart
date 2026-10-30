@@ -1,37 +1,89 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/chat_message.dart';
 import '../models/meal.dart';
 import '../models/nutritionist_profile.dart';
 import '../models/patient_profile.dart';
 import '../models/symptom_report.dart';
+import '../models/sync_operation.dart';
 import '../models/weight_entry.dart';
 
 /// ============================================
 /// SERVIÇO DE ARMAZENAMENTO LOCAL
 /// ============================================
+/// Os dados ficam separados por usuário: cada chave é gravada como
+/// `<userId>:<chave>`. Assim, outra conta no mesmo navegador não vê
+/// os dados da anterior.
 class LocalStorageService {
   static const String _keyProfile = 'patient_profile';
   static const String _keyNutritionistProfile = 'nutritionist_profile';
   static const String _keyWeights = 'weight_entries';
-  static const String _keyOnboarded = 'is_onboarded';
+  static const String _keyOnboarded = 'is_onboarded'; // global (por aparelho)
   static const String _keyMeals = 'meal_entries';
   static const String _keySymptoms = 'symptom_reports';
   static const String _keyChat = 'chat_messages';
+  static const String _keySyncQueue = 'sync_queue';
+  static const String _keyFoodCatalog = 'food_catalog';
+  static const String _keyFoodCatalogUpdatedAt = 'food_catalog_updated_at';
+
+  /// Chaves antigas (sem escopo de usuário) que são migradas para o primeiro
+  /// usuário que entrar depois desta atualização.
+  static const List<String> _legacyKeys = [
+    _keyProfile,
+    _keyNutritionistProfile,
+    _keyWeights,
+    _keyMeals,
+    _keySymptoms,
+    _keyChat,
+  ];
 
   static final LocalStorageService _instance = LocalStorageService._internal();
   factory LocalStorageService() => _instance;
   LocalStorageService._internal();
 
   // ============================================
+  // ESCOPO POR USUÁRIO
+  // ============================================
+  String get _scope {
+    try {
+      return Supabase.instance.client.auth.currentUser?.id ?? 'guest';
+    } catch (_) {
+      return 'guest';
+    }
+  }
+
+  String _k(String key) => '$_scope:$key';
+
+  Future<SharedPreferences> _prefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final scope = _scope;
+    if (scope == 'guest') return prefs;
+
+    final marker = '$scope:legacy_migrated';
+    if (prefs.getBool(marker) == true) return prefs;
+
+    for (final key in _legacyKeys) {
+      final legacy = prefs.getString(key);
+      if (legacy == null) continue;
+      if (prefs.getString('$scope:$key') == null) {
+        await prefs.setString('$scope:$key', legacy);
+      }
+      await prefs.remove(key);
+    }
+    await prefs.setBool(marker, true);
+    return prefs;
+  }
+
+  // ============================================
   // PERFIL DO PACIENTE
   // ============================================
   Future<bool> saveProfile(PatientProfile profile) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return await prefs.setString(_keyProfile, jsonEncode(_profileToJson(profile)));
+      final prefs = await _prefs();
+      return await prefs.setString(_k(_keyProfile), jsonEncode(_profileToJson(profile)));
     } catch (e) {
       return false;
     }
@@ -39,8 +91,8 @@ class LocalStorageService {
 
   Future<PatientProfile?> loadProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keyProfile);
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keyProfile));
       if (jsonString == null) return null;
       return _profileFromJson(jsonDecode(jsonString));
     } catch (e) {
@@ -53,7 +105,7 @@ class LocalStorageService {
   // ============================================
   Future<bool> saveNutritionistProfile(NutritionistProfile profile) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _prefs();
       final json = {
         'id': profile.id,
         'name': profile.name,
@@ -64,7 +116,7 @@ class LocalStorageService {
         'createdAt': profile.createdAt.toIso8601String(),
         'updatedAt': profile.updatedAt?.toIso8601String(),
       };
-      return await prefs.setString(_keyNutritionistProfile, jsonEncode(json));
+      return await prefs.setString(_k(_keyNutritionistProfile), jsonEncode(json));
     } catch (e) {
       return false;
     }
@@ -72,8 +124,8 @@ class LocalStorageService {
 
   Future<NutritionistProfile?> loadNutritionistProfile() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keyNutritionistProfile);
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keyNutritionistProfile));
       if (jsonString == null) return null;
 
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
@@ -110,8 +162,8 @@ class LocalStorageService {
 
   Future<List<WeightEntry>> loadWeights() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keyWeights);
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keyWeights));
       if (jsonString == null) return [];
       final list = jsonDecode(jsonString) as List<dynamic>;
       return list.map((item) => _weightFromJson(item)).toList();
@@ -130,9 +182,12 @@ class LocalStorageService {
     }
   }
 
+  /// Substitui todos os pesos (usado pelo SyncService ao mesclar dados da nuvem).
+  Future<bool> replaceAllWeights(List<WeightEntry> entries) => _saveAllWeights(entries);
+
   Future<bool> _saveAllWeights(List<WeightEntry> entries) async {
-    final prefs = await SharedPreferences.getInstance();
-    return await prefs.setString(_keyWeights, jsonEncode(entries.map((e) => _weightToJson(e)).toList()));
+    final prefs = await _prefs();
+    return await prefs.setString(_k(_keyWeights), jsonEncode(entries.map((e) => _weightToJson(e)).toList()));
   }
 
   // ============================================
@@ -141,6 +196,7 @@ class LocalStorageService {
   Future<bool> saveMeal(Meal meal) async {
     try {
       final meals = await loadMeals();
+      meals.removeWhere((m) => m.id == meal.id); // salvar de novo = atualizar
       meals.add(meal);
       meals.sort((a, b) => a.dateTime.compareTo(b.dateTime));
       return await _saveAllMeals(meals);
@@ -151,8 +207,8 @@ class LocalStorageService {
 
   Future<List<Meal>> loadMeals() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keyMeals);
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keyMeals));
       if (jsonString == null) return [];
       final list = jsonDecode(jsonString) as List<dynamic>;
       return list.map((item) => _mealFromJson(item)).toList();
@@ -176,9 +232,12 @@ class LocalStorageService {
     }
   }
 
+  /// Substitui todas as refeições (usado pelo SyncService ao mesclar dados da nuvem).
+  Future<bool> replaceAllMeals(List<Meal> meals) => _saveAllMeals(meals);
+
   Future<bool> _saveAllMeals(List<Meal> meals) async {
-    final prefs = await SharedPreferences.getInstance();
-    return await prefs.setString(_keyMeals, jsonEncode(meals.map((m) => _mealToJson(m)).toList()));
+    final prefs = await _prefs();
+    return await prefs.setString(_k(_keyMeals), jsonEncode(meals.map((m) => _mealToJson(m)).toList()));
   }
 
   // ============================================
@@ -187,6 +246,7 @@ class LocalStorageService {
   Future<bool> saveSymptomReport(SymptomReport report) async {
     try {
       final reports = await loadSymptomReports();
+      reports.removeWhere((r) => r.id == report.id); // salvar de novo = atualizar
       reports.add(report);
       reports.sort((a, b) => b.date.compareTo(a.date));
       return await _saveAllSymptomReports(reports);
@@ -197,8 +257,8 @@ class LocalStorageService {
 
   Future<List<SymptomReport>> loadSymptomReports() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keySymptoms);
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keySymptoms));
       if (jsonString == null) return [];
       final list = jsonDecode(jsonString) as List<dynamic>;
       return list.map((item) => _symptomFromJson(item)).toList();
@@ -212,9 +272,12 @@ class LocalStorageService {
     return reports.isEmpty ? null : reports.first;
   }
 
+  /// Substitui todos os relatórios (usado pelo SyncService ao mesclar dados da nuvem).
+  Future<bool> replaceAllSymptomReports(List<SymptomReport> reports) => _saveAllSymptomReports(reports);
+
   Future<bool> _saveAllSymptomReports(List<SymptomReport> reports) async {
-    final prefs = await SharedPreferences.getInstance();
-    return await prefs.setString(_keySymptoms, jsonEncode(reports.map((r) => _symptomToJson(r)).toList()));
+    final prefs = await _prefs();
+    return await prefs.setString(_k(_keySymptoms), jsonEncode(reports.map((r) => _symptomToJson(r)).toList()));
   }
 
   // ============================================
@@ -233,8 +296,8 @@ class LocalStorageService {
 
   Future<List<ChatMessage>> loadChatMessages() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keyChat);
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keyChat));
       if (jsonString == null) return [];
       final list = jsonDecode(jsonString) as List<dynamic>;
       return list.map((item) => _chatMessageFromJson(item)).toList();
@@ -269,8 +332,32 @@ class LocalStorageService {
   }
 
   Future<bool> _saveAllChatMessages(List<ChatMessage> messages) async {
-    final prefs = await SharedPreferences.getInstance();
-    return await prefs.setString(_keyChat, jsonEncode(messages.map((m) => _chatMessageToJson(m)).toList()));
+    final prefs = await _prefs();
+    return await prefs.setString(_k(_keyChat), jsonEncode(messages.map((m) => _chatMessageToJson(m)).toList()));
+  }
+
+  // ============================================
+  // FILA DE SINCRONIZAÇÃO
+  // ============================================
+  Future<List<SyncOperation>> loadSyncOperations() async {
+    try {
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keySyncQueue));
+      if (jsonString == null) return [];
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      return list.map((item) => SyncOperation.fromJson(item as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> saveSyncOperations(List<SyncOperation> operations) async {
+    try {
+      final prefs = await _prefs();
+      return await prefs.setString(_k(_keySyncQueue), jsonEncode(operations.map((o) => o.toJson()).toList()));
+    } catch (e) {
+      return false;
+    }
   }
 
   // ============================================
@@ -291,6 +378,42 @@ class LocalStorageService {
     await prefs.clear();
   }
 
+  // ============================================
+  // CATÁLOGO DE ALIMENTOS (TACO)
+  // Dados públicos: ficam sem escopo de usuário
+  // ============================================
+  Future<bool> saveFoodCatalog(List<Map<String, dynamic>> foods) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyFoodCatalogUpdatedAt, DateTime.now().toIso8601String());
+      return await prefs.setString(_keyFoodCatalog, jsonEncode(foods));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> loadFoodCatalog() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_keyFoodCatalog);
+      if (jsonString == null) return [];
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<DateTime?> foodCatalogUpdatedAt() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final value = prefs.getString(_keyFoodCatalogUpdatedAt);
+      return value == null ? null : DateTime.parse(value);
+    } catch (e) {
+      return null;
+    }
+  }
+  
   // ============================================
   // CONVERSORES
   // ============================================

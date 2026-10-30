@@ -15,6 +15,8 @@ import '../../../widgets/next_meal_card.dart';
 import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart'; 
 import '../meal/register_meal_page.dart';
+import '../../../services/sync_service.dart';
+import '../../../services/food_service.dart'; // IMPORT NECESSÁRIO
 
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -31,6 +33,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
   int _currentNavIndex = 0;
   final _authService = AuthService();
   final _localStorage = LocalStorageService();
+  final _syncService = SyncService();
+  bool _isSyncing = false;
   
   PatientProfile? _profile;
   int _mealsTodayCount = 0;
@@ -55,25 +59,30 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     super.dispose();
   }
 
+  // Mostra os dados locais na hora e sincroniza em segundo plano
   Future<void> _loadData() async {
+    await _loadFromLocal();
+    _syncInBackground();
+  }
+
+  Future<void> _loadFromLocal({Map<String, dynamic>? cloudProfile}) async {
     try {
-      // Busca da nuvem (Supabase)
-      final cloudProfile = await _authService.getPatientProfile();
-      final mealsToday = await _authService.getMealsFromCloud(date: DateTime.now());
-      final weights = await _authService.getWeightsFromCloud();
-      final latestSymptom = await _authService.getLatestSymptomFromCloud();
+      final localProfile = await _localStorage.loadProfile();
+      final mealsToday = await _localStorage.loadMealsByDate(DateTime.now());
+      final weights = await _localStorage.loadWeights();
+      final latestSymptom = await _localStorage.loadLatestSymptomReport();
 
       if (!mounted) return;
 
       setState(() {
+        var profile = localProfile ?? PatientProfile.mock();
         if (cloudProfile != null) {
-          _profile = PatientProfile.mock().copyWith(
+          profile = profile.copyWith(
             name: cloudProfile['name'] as String?,
             email: cloudProfile['email'] as String?,
           );
-        } else {
-          _profile = PatientProfile.mock();
         }
+        _profile = profile;
 
         _mealsTodayCount = mealsToday.length;
         _latestSymptom = latestSymptom;
@@ -86,17 +95,36 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
           _initialWeight = null;
           _currentWeight = null;
         }
-        _goalWeight = 65.0;
+        _goalWeight = profile.goalWeightKg ?? 65.0;
 
         _isLoading = false;
       });
     } catch (e) {
-      print('Erro ao carregar dashboard: $e');
+      debugPrint('Erro ao carregar dashboard: $e');
       if (!mounted) return;
       setState(() {
-        _profile = PatientProfile.mock();
+        _profile ??= PatientProfile.mock();
         _isLoading = false;
       });
+    }
+  }
+
+  // Envia pendências, traz novidades da nuvem e atualiza a tela
+  Future<void> _syncInBackground() async {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    try {
+      // ⚠️ CORREÇÃO APLICADA AQUI: Baixa o catálogo da TACO
+      FoodService().refreshCatalogIfNeeded();
+
+      await _syncService.syncAll();
+      final cloudProfile = await _authService.getPatientProfile();
+      if (!mounted) return;
+      await _loadFromLocal(cloudProfile: cloudProfile);
+    } catch (e) {
+      debugPrint('Erro ao sincronizar dashboard: $e');
+    } finally {
+      _isSyncing = false;
     }
   }
 
@@ -112,16 +140,13 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     if (mounted) _loadData(); // Recarrega ao voltar de qualquer aba
   }
 
-  // ============================================
-  // NOVA FUNÇÃO: ABRIR TELA DE REGISTRO DIRETO
-  // ============================================
+  // Abre a tela de registro e atualiza ao voltar
   Future<void> _openRegisterMeal() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RegisterMealPage()),
     );
 
-    // Se salvou, recarrega os dados na tela
     if (result == true && mounted) {
       _loadData();
     }

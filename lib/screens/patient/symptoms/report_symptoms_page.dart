@@ -4,10 +4,11 @@ import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/symptom_report.dart';
-import '../../../services/auth_service.dart';
+import '../../../core/utils/id_generator.dart'; // IMPORT ADICIONADO
+import '../../../services/sync_service.dart'; // IMPORT ADICIONADO (AuthService REMOVIDO)
 
 /// ============================================
-/// TELA: RELATAR SINTOMAS (Supabase)
+/// TELA: RELATAR SINTOMAS (Offline-First)
 /// ============================================
 class ReportSymptomsPage extends StatefulWidget {
   const ReportSymptomsPage({super.key});
@@ -18,7 +19,7 @@ class ReportSymptomsPage extends StatefulWidget {
 
 class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
   final _notesController = TextEditingController();
-  final _authService = AuthService();
+  final _syncService = SyncService(); // TROCADO AQUI
 
   final Set<String> _selectedSymptoms = {};
   final Set<String> _selectedDifficulties = {};
@@ -47,39 +48,46 @@ class _ReportSymptomsPageState extends State<ReportSymptomsPage> {
 
     setState(() => _isSaving = true);
 
+    // ⚠️ BLOCO SUBSTITUÍDO E CORRIGIDO
     final report = SymptomReport(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: IdGenerator.uuid(), // ID Universal
       date: DateTime.now(),
       symptoms: _selectedSymptoms.toList(),
       difficulties: _selectedDifficulties.toList(),
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
     );
 
-    final error = await _authService.saveSymptomToCloud(report);
+    final status = await _syncService.saveSymptomReport(report);
 
     if (!mounted) return;
-    setState(() => _isSaving = false);
+    setState(() => _isSaving = false); // Garante que o botão volta a funcionar
 
-    if (error == null) {
+    if (status == SyncStatus.localFailed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Relato salvo com sucesso!'),
-          backgroundColor: AppColors.success,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) AppRoutes.back(context);
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
+          content: Text('Não foi possível salvar o relato. Tente novamente.'),
           backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          status == SyncStatus.synced
+              ? 'Relato salvo com sucesso!'
+              : 'Relato salvo no aparelho! Será enviado quando houver conexão.',
+        ),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) AppRoutes.back(context);
+    });
+    // ⚠️ FIM DO BLOCO SUBSTITUÍDO
   }
 
   @override
