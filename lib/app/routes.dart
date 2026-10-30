@@ -13,7 +13,7 @@ import '../screens/patient/diary/diary_page.dart';
 import '../screens/patient/evolution/evolution_page.dart';
 import '../screens/patient/evolution/register_weight_page.dart';
 import '../screens/patient/symptoms/report_symptoms_page.dart';
-import '../screens/patient/anamnesis/fill_anamnesis_page.dart'; // ⚠️ NOVO
+import '../screens/patient/anamnesis/fill_anamnesis_page.dart';
 import '../screens/nutritionist/dashboard/nutritionist_dashboard_page.dart';
 import '../screens/nutritionist/patients/patients_page.dart';
 import '../screens/nutritionist/patients/patient_detail_page.dart';
@@ -39,7 +39,7 @@ class AppRoutes {
   static const String evolution = '/evolution';
   static const String registerWeight = '/register-weight';
   static const String reportSymptoms = '/report-symptoms';
-  static const String fillAnamnesis = '/fill-anamnesis'; // ⚠️ NOVO
+  static const String fillAnamnesis = '/fill-anamnesis';
   static const String nutritionistDashboard = '/nutritionist-dashboard';
   static const String nutritionistPatients = '/nutritionist-patients';
   static const String nutritionistPatientDetail = '/nutritionist-patient-detail';
@@ -64,15 +64,31 @@ class AppRoutes {
       evolution: (_) => const EvolutionPage(),
       registerWeight: (_) => const RegisterWeightPage(),
       reportSymptoms: (_) => const ReportSymptomsPage(),
-      fillAnamnesis: (_) => const FillAnamnesisPage(), // ⚠️ NOVO
+      fillAnamnesis: (_) => const FillAnamnesisPage(),
       nutritionistDashboard: (_) => const NutritionistDashboardPage(),
       nutritionistPatients: (_) => const PatientsPage(),
       nutritionistPatientDetail: (_) => const PatientDetailPage(),
       nutritionistMessages: (_) => const NutritionistMessagesPage(),
       nutritionistProfile: (_) => const NutritionistProfilePage(),
       editNutritionistProfile: (_) => const EditNutritionistProfilePage(),
-      patientChat: (_) => const ChatPage(isNutritionist: false, otherPartyName: 'Dra. Ana'),
-      nutritionistChat: (_) => const ChatPage(isNutritionist: true, otherPartyName: 'Maria Silva'),
+      
+      // CHAT DO PACIENTE: O nome da nutricionista pode ser fixo por enquanto, 
+      // ou podemos buscar do banco no futuro.
+      patientChat: (_) => const ChatPage(
+        isNutritionist: false, 
+        otherPartyName: 'Minha Nutricionista',
+      ),
+      
+      // CHAT DO NUTRICIONISTA: Vamos usar o onGenerateRoute (abaixo) para passar os argumentos
+      nutritionistChat: (context) {
+        final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+        return ChatPage(
+          isNutritionist: true, 
+          otherPartyName: args?['name'] ?? 'Paciente',
+          patientId: args?['patientId'],
+        );
+      },
+      
       '/avatar-test': (_) => const AvatarTestPage(),
     };
   }

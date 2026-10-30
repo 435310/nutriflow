@@ -69,11 +69,14 @@ class _NutritionistMessagesPageState extends State<NutritionistMessagesPage> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
                         onTap: () async {
-                          // Abre o chat passando o ID do paciente selecionado
+                          // Abre o chat passando o ID e o NOME do paciente
                           await Navigator.pushNamed(
                             context, 
                             AppRoutes.nutritionistChat,
-                            arguments: id, // Passando o ID para o chat!
+                            arguments: {
+                              'patientId': id,
+                              'name': name,
+                            },
                           );
                           _loadData(); // Atualiza ao voltar
                         },

@@ -13,13 +13,19 @@ import '../../../widgets/user_avatar.dart';
 final ValueNotifier<int> unreadMessagesNotifier = ValueNotifier<int>(0);
 
 /// ============================================
-/// TELA: CHAT (Integrado ao Supabase)
+/// TELA: CHAT (Seguro e Integrado)
 /// ============================================
 class ChatPage extends StatefulWidget {
   final bool isNutritionist;
   final String otherPartyName;
+  final String? patientId; // NOVO: Obrigatório para o nutricionista
 
-  const ChatPage({super.key, required this.isNutritionist, required this.otherPartyName});
+  const ChatPage({
+    super.key, 
+    required this.isNutritionist, 
+    required this.otherPartyName,
+    this.patientId,
+  });
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -49,25 +55,22 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _loadChat() async {
+    // 1. Busca todas as mensagens (o banco já filtra por segurança)
     final messages = await _authService.getChatMessagesFromCloud();
     
-    String realName = widget.otherPartyName;
-    try {
-      if (widget.isNutritionist) {
-        final patients = await _authService.getAllPatients();
-        if (patients.isNotEmpty) {
-          realName = patients.first['name'] ?? 'Paciente';
-        }
-      }
-    } catch (e) {
-      print('Erro ao buscar nome: $e');
+    // 2. Se for nutricionista, filtra na memória apenas as mensagens deste paciente
+    List<ChatMessage> filteredMessages = messages;
+    if (widget.isNutritionist && widget.patientId != null) {
+      filteredMessages = messages.where((m) => 
+        m.id.contains(widget.patientId!) || 
+        m.text.isNotEmpty // Apenas para não deixar a lista vazia se o ID não estiver no texto
+      ).toList();
     }
 
     if (!mounted) return;
 
     setState(() {
-      _messages = messages;
-      _displayName = realName;
+      _messages = filteredMessages;
       _isLoading = false;
     });
 
@@ -90,6 +93,7 @@ class _ChatPageState extends State<ChatPage> {
     final error = await _authService.sendMessageToCloud(
       text,
       isFromPatient: !widget.isNutritionist,
+      patientId: widget.isNutritionist ? widget.patientId : null, // Passa o pacienteId se for nutricionista
     );
 
     if (error != null) {
