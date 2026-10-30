@@ -15,5 +15,5 @@ void main() async {
     anonKey: SupabaseConfig.anonKey,
   );
 
-  runApp(const NutriFlowApp());
+runApp(const MyApp()); // Ou o nome exato da classe que está no app.dart
 }

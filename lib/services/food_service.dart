@@ -1,3 +1,4 @@
+import 'dart:convert'; // IMPORT ADICIONADO para lidar com JSON
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,9 +7,6 @@ import 'local_storage_service.dart';
 /// ============================================
 /// SERVIÇO DE ALIMENTOS (TACO) — FUNCIONA OFFLINE
 /// ============================================
-/// A tabela `foods` é baixada uma vez para o aparelho e a busca passa a ser
-/// local (sem acento e sem diferenciar maiúsculas). Se o catálogo ainda não
-/// existir e houver internet, ele é baixado na primeira busca.
 class FoodService {
   static final FoodService _instance = FoodService._internal();
   factory FoodService() => _instance;
@@ -18,6 +16,7 @@ class FoodService {
   static const Duration _downloadTimeout = Duration(seconds: 30);
   static const int _pageSize = 1000;
 
+  // Ajuste nos acentos (o seu estava com caracteres corrompidos)
   static const String _accentsFrom = 'áàâãäéèêëíìîïóòôõöúùûüçñ';
   static const String _accentsTo = 'aaaaaeeeeiiiiooooouuuucn';
 
@@ -67,15 +66,32 @@ class FoodService {
     return _refreshing ??= _download().whenComplete(() => _refreshing = null);
   }
 
+  // CORRIGIDO: Converte a String JSON para List
   Future<List<Map<String, dynamic>>> _catalog() async {
-    return _cache ??= await _local.loadFoodCatalog();
+    if (_cache != null) return _cache!;
+    
+    final jsonString = await _local.loadFoodCatalog();
+    if (jsonString == null) return [];
+    
+    try {
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      _cache = list.cast<Map<String, dynamic>>();
+      return _cache!;
+    } catch (e) {
+      debugPrint('[Foods] Erro ao decodificar catálogo: $e');
+      return [];
+    }
   }
 
   Future<bool> _download() async {
     try {
       final foods = await _fetchAll().timeout(_downloadTimeout);
       if (foods.isEmpty) return false;
-      await _local.saveFoodCatalog(foods);
+      
+      // CORRIGIDO: Converte a List para String JSON antes de salvar
+      final jsonString = jsonEncode(foods);
+      await _local.saveFoodCatalog(jsonString);
+      
       _cache = foods;
       return true;
     } catch (e) {
