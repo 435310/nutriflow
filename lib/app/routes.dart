@@ -13,6 +13,7 @@ import '../screens/patient/diary/diary_page.dart';
 import '../screens/patient/evolution/evolution_page.dart';
 import '../screens/patient/evolution/register_weight_page.dart';
 import '../screens/patient/symptoms/report_symptoms_page.dart';
+import '../screens/patient/anamnesis/fill_anamnesis_page.dart'; // ⚠️ NOVO
 import '../screens/nutritionist/dashboard/nutritionist_dashboard_page.dart';
 import '../screens/nutritionist/patients/patients_page.dart';
 import '../screens/nutritionist/patients/patient_detail_page.dart';
@@ -38,6 +39,7 @@ class AppRoutes {
   static const String evolution = '/evolution';
   static const String registerWeight = '/register-weight';
   static const String reportSymptoms = '/report-symptoms';
+  static const String fillAnamnesis = '/fill-anamnesis'; // ⚠️ NOVO
   static const String nutritionistDashboard = '/nutritionist-dashboard';
   static const String nutritionistPatients = '/nutritionist-patients';
   static const String nutritionistPatientDetail = '/nutritionist-patient-detail';
@@ -62,6 +64,7 @@ class AppRoutes {
       evolution: (_) => const EvolutionPage(),
       registerWeight: (_) => const RegisterWeightPage(),
       reportSymptoms: (_) => const ReportSymptomsPage(),
+      fillAnamnesis: (_) => const FillAnamnesisPage(), // ⚠️ NOVO
       nutritionistDashboard: (_) => const NutritionistDashboardPage(),
       nutritionistPatients: (_) => const PatientsPage(),
       nutritionistPatientDetail: (_) => const PatientDetailPage(),

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/anamnesis.dart';
 import '../models/chat_message.dart';
 import '../models/meal.dart';
 import '../models/symptom_report.dart';
@@ -476,7 +477,6 @@ class AuthService {
       final fileExt = fileName.split('.').last;
       final uniqueName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
-      // ⚠️ Usa uploadBinary que funciona no Web e no Celular
       await _supabase.storage.from('meal-photos').uploadBinary(
         uniqueName,
         bytes, 
@@ -489,6 +489,100 @@ class AuthService {
       return uniqueName;
     } catch (e) {
       print('Erro ao fazer upload da foto: $e');
+      return null;
+    }
+  }
+
+  // ============================================
+  // ANAMNESE
+  // ============================================
+  Future<String?> saveAnamnesis(Anamnesis anamnesis) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      final existing = await _supabase
+          .from('anamnesis')
+          .select('id')
+          .eq('patient_id', user.id)
+          .maybeSingle();
+
+      if (existing != null) {
+        await _supabase.from('anamnesis').update({
+          'main_goal': anamnesis.mainGoal,
+          'health_conditions': anamnesis.healthConditions,
+          'medications': anamnesis.medications,
+          'supplements': anamnesis.supplements,
+          'bowel_habits': anamnesis.bowelHabits,
+          'sleep_quality': anamnesis.sleepQuality,
+          'water_intake': anamnesis.waterIntake,
+          'alcohol_consumption': anamnesis.alcoholConsumption,
+          'smoking': anamnesis.smoking,
+          'physical_activity': anamnesis.physicalActivity,
+          'food_allergies': anamnesis.foodAllergies,
+          'food_intolerances': anamnesis.foodIntolerances,
+          'dietary_preferences': anamnesis.dietaryPreferences,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('patient_id', user.id);
+      } else {
+        await _supabase.from('anamnesis').insert({
+          'patient_id': user.id,
+          'main_goal': anamnesis.mainGoal,
+          'health_conditions': anamnesis.healthConditions,
+          'medications': anamnesis.medications,
+          'supplements': anamnesis.supplements,
+          'bowel_habits': anamnesis.bowelHabits,
+          'sleep_quality': anamnesis.sleepQuality,
+          'water_intake': anamnesis.waterIntake,
+          'alcohol_consumption': anamnesis.alcoholConsumption,
+          'smoking': anamnesis.smoking,
+          'physical_activity': anamnesis.physicalActivity,
+          'food_allergies': anamnesis.foodAllergies,
+          'food_intolerances': anamnesis.foodIntolerances,
+          'dietary_preferences': anamnesis.dietaryPreferences,
+        });
+      }
+
+      return null;
+    } catch (e) {
+      print('Erro ao salvar anamnese: $e');
+      return 'Erro ao salvar anamnese: $e';
+    }
+  }
+
+  Future<Anamnesis?> getAnamnesis(String patientId) async {
+    try {
+      final response = await _supabase
+          .from('anamnesis')
+          .select()
+          .eq('patient_id', patientId)
+          .maybeSingle();
+
+      if (response == null) return null;
+
+      return Anamnesis(
+        id: response['id'] as String,
+        patientId: response['patient_id'] as String,
+        mainGoal: response['main_goal'] as String?,
+        healthConditions: response['health_conditions'] as String?,
+        medications: response['medications'] as String?,
+        supplements: response['supplements'] as String?,
+        bowelHabits: response['bowel_habits'] as String?,
+        sleepQuality: response['sleep_quality'] as String?,
+        waterIntake: response['water_intake'] as String?,
+        alcoholConsumption: response['alcohol_consumption'] as String?,
+        smoking: response['smoking'] as String?,
+        physicalActivity: response['physical_activity'] as String?,
+        foodAllergies: response['food_allergies'] as String?,
+        foodIntolerances: response['food_intolerances'] as String?,
+        dietaryPreferences: response['dietary_preferences'] as String?,
+        createdAt: DateTime.parse(response['created_at'] as String),
+        updatedAt: response['updated_at'] != null 
+            ? DateTime.parse(response['updated_at'] as String) 
+            : null,
+      );
+    } catch (e) {
+      print('Erro ao buscar anamnese: $e');
       return null;
     }
   }
