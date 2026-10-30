@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // IMPORT ADICIONADO
 
 import '../screens/welcome/welcome_page.dart';
 import '../screens/profile_choice/profile_choice_page.dart';
@@ -72,14 +73,40 @@ class AppRoutes {
       nutritionistProfile: (_) => const NutritionistProfilePage(),
       editNutritionistProfile: (_) => const EditNutritionistProfilePage(),
       
-      // CHAT DO PACIENTE: O nome da nutricionista pode ser fixo por enquanto, 
-      // ou podemos buscar do banco no futuro.
-      patientChat: (_) => const ChatPage(
-        isNutritionist: false, 
-        otherPartyName: 'Minha Nutricionista',
-      ),
+      // CHAT DO PACIENTE: Busca o nome real da nutricionista no banco
+      patientChat: (context) {
+        final user = Supabase.instance.client.auth.currentUser;
+        
+        // Se não estiver logado, retorna um nome padrão
+        if (user == null) {
+          return const ChatPage(isNutritionist: false, otherPartyName: 'Minha Nutricionista');
+        }
+
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: Supabase.instance.client
+              .from('patient_profiles')
+              .select('nutritionist_profiles(name)')
+              .eq('user_id', user.id)
+              .maybeSingle(),
+          builder: (context, snapshot) {
+            String nutriName = 'Minha Nutricionista';
+            
+            if (snapshot.hasData && snapshot.data != null) {
+              final data = snapshot.data!;
+              if (data['nutritionist_profiles'] != null) {
+                nutriName = data['nutritionist_profiles']['name'] as String? ?? nutriName;
+              }
+            }
+
+            return ChatPage(
+              isNutritionist: false, 
+              otherPartyName: nutriName,
+            );
+          },
+        );
+      },
       
-      // CHAT DO NUTRICIONISTA: Vamos usar o onGenerateRoute (abaixo) para passar os argumentos
+      // CHAT DO NUTRICIONISTA: Pega os argumentos enviados pela lista
       nutritionistChat: (context) {
         final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
         return ChatPage(
