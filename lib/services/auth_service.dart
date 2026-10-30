@@ -493,6 +493,19 @@ class AuthService {
     }
   }
 
+  // ⚠️ GERAR URL TEMPORÁRIA DA FOTO
+  Future<String?> getMealPhotoUrl(String path) async {
+    try {
+      final response = await _supabase.storage
+          .from('meal-photos')
+          .createSignedUrl(path, 3600); // 1 hora de validade
+      return response;
+    } catch (e) {
+      print('Erro ao gerar URL da foto: $e');
+      return null;
+    }
+  }
+
   // ============================================
   // ANAMNESE
   // ============================================

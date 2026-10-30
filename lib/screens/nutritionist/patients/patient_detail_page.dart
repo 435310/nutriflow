@@ -4,8 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
+import '../../../models/anamnesis.dart';
 import '../../../models/meal.dart';
-import '../../../models/symptom_report.dart';
 import '../../../models/weight_entry.dart';
 import '../../../services/auth_service.dart';
 import '../../../widgets/mini_weight_chart.dart';
@@ -13,7 +13,7 @@ import '../../../widgets/patient_detail_section.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
-/// TELA: PERFIL DO PACIENTE (Nuvem)
+/// TELA: PERFIL DO PACIENTE (visão do nutricionista)
 /// ============================================
 class PatientDetailPage extends StatefulWidget {
   const PatientDetailPage({super.key});
@@ -31,9 +31,9 @@ class _PatientDetailPageState extends State<PatientDetailPage>
   
   String? _patientId;
   Map<String, dynamic>? _profile;
+  Anamnesis? _anamnesis;
   List<WeightEntry> _weightHistory = [];
   List<Meal> _recentMeals = [];
-  List<SymptomReport> _recentSymptoms = [];
   bool _isLoading = true;
 
   @override
@@ -71,7 +71,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
 
       final weights = await _authService.getPatientWeights(_patientId!);
       final meals = await _authService.getPatientMeals(_patientId!);
-      final symptoms = await _authService.getPatientSymptoms(_patientId!);
+      final anamnesis = await _authService.getAnamnesis(_patientId!);
 
       if (!mounted) return;
 
@@ -79,7 +79,7 @@ class _PatientDetailPageState extends State<PatientDetailPage>
         _profile = profileResponse;
         _weightHistory = weights;
         _recentMeals = meals;
-        _recentSymptoms = symptoms;
+        _anamnesis = anamnesis;
         _isLoading = false;
       });
     } catch (e) {
@@ -140,6 +140,31 @@ class _PatientDetailPageState extends State<PatientDetailPage>
                 Text('Observações', style: AppTextStyles.h3),
                 const SizedBox(height: 8),
                 Text(meal.notes!, style: AppTextStyles.bodySecondary.copyWith(fontStyle: FontStyle.italic)),
+              ],
+              if (meal.photoPath != null) ...[
+                const SizedBox(height: 20),
+                Text('Foto', style: AppTextStyles.h3),
+                const SizedBox(height: 8),
+                FutureBuilder<String?>(
+                  future: _authService.getMealPhotoUrl(meal.photoPath!),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasData && snapshot.data != null) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          snapshot.data!,
+                          fit: BoxFit.contain,
+                          width: double.infinity,
+                          height: 200,
+                        ),
+                      );
+                    }
+                    return const Text('Não foi possível carregar a foto.');
+                  },
+                ),
               ],
               const SizedBox(height: 32),
             ],
@@ -242,16 +267,32 @@ class _PatientDetailPageState extends State<PatientDetailPage>
                 ),
                 const SizedBox(height: 16),
 
-                // ⚠️ SINTOMAS REAIS DA NUVEM
+                // ⚠️ ANAMNESE
                 PatientDetailSection(
-                  icon: Icons.psychology_outlined,
-                  title: 'Sintomas e dificuldades',
-                  child: _recentSymptoms.isEmpty
-                      ? _buildEmptyInfo('Nenhum sintoma registrado')
+                  icon: Icons.assignment_outlined,
+                  title: 'Anamnese (Primeira Consulta)',
+                  child: _anamnesis == null
+                      ? _buildEmptyInfo('Anamnese não preenchida pelo paciente')
                       : Column(
-                          children: _recentSymptoms.take(2).map((report) => _buildSymptomRow(report)).toList(),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_anamnesis!.mainGoal != null) _buildAnamnesisItem('Objetivo', _anamnesis!.mainGoal!),
+                            if (_anamnesis!.healthConditions != null) _buildAnamnesisItem('Condições de saúde', _anamnesis!.healthConditions!),
+                            if (_anamnesis!.medications != null) _buildAnamnesisItem('Medicamentos', _anamnesis!.medications!),
+                            if (_anamnesis!.supplements != null) _buildAnamnesisItem('Suplementos', _anamnesis!.supplements!),
+                            if (_anamnesis!.bowelHabits != null) _buildAnamnesisItem('Intestino', _anamnesis!.bowelHabits!),
+                            if (_anamnesis!.sleepQuality != null) _buildAnamnesisItem('Sono', _anamnesis!.sleepQuality!),
+                            if (_anamnesis!.waterIntake != null) _buildAnamnesisItem('Água/dia', _anamnesis!.waterIntake!),
+                            if (_anamnesis!.alcoholConsumption != null) _buildAnamnesisItem('Álcool', _anamnesis!.alcoholConsumption!),
+                            if (_anamnesis!.smoking != null) _buildAnamnesisItem('Tabagismo', _anamnesis!.smoking!),
+                            if (_anamnesis!.physicalActivity != null) _buildAnamnesisItem('Atividade física', _anamnesis!.physicalActivity!),
+                            if (_anamnesis!.foodAllergies != null) _buildAnamnesisItem('Alergias alimentares', _anamnesis!.foodAllergies!),
+                            if (_anamnesis!.foodIntolerances != null) _buildAnamnesisItem('Intolerâncias', _anamnesis!.foodIntolerances!),
+                            if (_anamnesis!.dietaryPreferences != null) _buildAnamnesisItem('Preferências', _anamnesis!.dietaryPreferences!),
+                          ],
                         ),
                 ),
+
                 const SizedBox(height: 24),
 
                 ElevatedButton.icon(
@@ -305,46 +346,14 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     );
   }
 
-  Widget _buildSymptomRow(SymptomReport report) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10)),
-      child: Column(
+  Widget _buildAnamnesisItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                height: 32, width: 32,
-                decoration: BoxDecoration(color: const Color(0xFF9B51E0).withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.psychology_outlined, size: 18, color: Color(0xFF9B51E0)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(report.summary, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500))),
-              Text('${report.date.day}/${report.date.month}', style: AppTextStyles.caption),
-            ],
-          ),
-          if (report.symptoms.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: report.symptoms.map((s) => _SymptomTag(label: s, color: AppColors.error)).toList(),
-            ),
-          ],
-          if (report.difficulties.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: report.difficulties.map((d) => _SymptomTag(label: d, color: AppColors.warning)).toList(),
-            ),
-          ],
-          if (report.notes != null && report.notes!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(report.notes!, style: AppTextStyles.caption.copyWith(fontStyle: FontStyle.italic)),
-          ],
+          SizedBox(width: 130, child: Text(label, style: AppTextStyles.caption)),
+          Expanded(child: Text(value, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -354,21 +363,6 @@ class _PatientDetailPageState extends State<PatientDetailPage>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Text(text, style: AppTextStyles.caption, textAlign: TextAlign.center),
-    );
-  }
-}
-
-class _SymptomTag extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _SymptomTag({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
-      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: color)),
     );
   }
 }
