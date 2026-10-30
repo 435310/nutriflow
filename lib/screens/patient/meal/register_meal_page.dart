@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
@@ -9,7 +11,7 @@ import '../../../widgets/food_item_field.dart';
 import '../../../widgets/meal_type_selector.dart';
 
 /// ============================================
-/// TELA: REGISTRAR REFEIÇÃO (Integrada ao Supabase)
+/// TELA: REGISTRAR REFEIÇÃO (com Foto)
 /// ============================================
 class RegisterMealPage extends StatefulWidget {
   const RegisterMealPage({super.key});
@@ -25,10 +27,38 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
   DateTime _selectedDateTime = DateTime.now();
   bool _isSaving = false;
 
+  final _picker = ImagePicker();
+  XFile? _selectedImage;
+  Uint8List? _imageBytes;
+  bool _isUploading = false;
+
   @override
   void dispose() {
     _notesController.dispose();
     super.dispose();
+  }
+
+  // ============================================
+  // ESCOLHER FOTO
+  // ============================================
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _selectedImage = image;
+          _imageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      print('Erro ao escolher imagem: $e');
+      _showSnackBar('Erro ao escolher imagem', isError: true);
+    }
   }
 
   // ============================================
@@ -89,6 +119,26 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
 
     setState(() => _isSaving = true);
 
+    String? photoPath;
+
+    // ⚠️ Faz o upload da foto se o usuário escolheu uma
+    if (_selectedImage != null && _imageBytes != null) {
+      setState(() => _isUploading = true);
+      final authService = AuthService();
+      
+      // ⚠️ Passa os bytes e o nome do arquivo
+      photoPath = await authService.uploadMealPhoto(_imageBytes!, _selectedImage!.name);
+      
+      if (photoPath == null) {
+        setState(() {
+          _isSaving = false;
+          _isUploading = false;
+        });
+        _showSnackBar('Erro ao enviar a foto. Tente novamente.', isError: true);
+        return;
+      }
+    }
+
     final meal = Meal(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       type: _selectedType!,
@@ -97,9 +147,9 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
       notes: _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
+      photoPath: photoPath,
     );
 
-    // Salva no Supabase
     final authService = AuthService();
     final error = await authService.saveMealToCloud(meal);
 
@@ -253,6 +303,43 @@ class _RegisterMealPageState extends State<RegisterMealPage> {
                     onRemove: () => _removeFood(entry.key),
                   );
                 }),
+              const SizedBox(height: 32),
+
+              // ⚠️ BOTÃO DE FOTO
+              const _SectionTitle(
+                icon: Icons.camera_alt_outlined,
+                title: 'Foto da refeição (opcional)',
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: _pickImage,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: double.infinity,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.inputBorder),
+                  ),
+                  child: _imageBytes != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.memory(
+                            _imageBytes!,
+                            fit: BoxFit.contain,
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_a_photo, size: 40, color: AppColors.primary),
+                            const SizedBox(height: 8),
+                            Text('Toque para adicionar uma foto', style: AppTextStyles.caption),
+                          ],
+                        ),
+                ),
+              ),
               const SizedBox(height: 32),
 
               const _SectionTitle(

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/chat_message.dart';
@@ -465,6 +466,34 @@ class AuthService {
   }
 
   // ============================================
+  // UPLOAD DE FOTO (SUPABASE STORAGE)
+  // ============================================
+  Future<String?> uploadMealPhoto(Uint8List bytes, String fileName) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return null;
+
+      final fileExt = fileName.split('.').last;
+      final uniqueName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+      // ⚠️ Usa uploadBinary que funciona no Web e no Celular
+      await _supabase.storage.from('meal-photos').uploadBinary(
+        uniqueName,
+        bytes, 
+        fileOptions: const FileOptions(
+          contentType: 'image/jpeg',
+          upsert: true,
+        ),
+      );
+
+      return uniqueName;
+    } catch (e) {
+      print('Erro ao fazer upload da foto: $e');
+      return null;
+    }
+  }
+
+  // ============================================
   // NUTRICIONISTA: LISTAR PACIENTES E DADOS
   // ============================================
   Future<List<Map<String, dynamic>>> getAllPatients() async {
@@ -505,6 +534,7 @@ class AuthService {
           dateTime: DateTime.parse(row['date_time'] as String),
           foods: foods,
           notes: row['notes'] as String?,
+          photoPath: row['photo_path'] as String?,
         ));
       }
       return meals;
