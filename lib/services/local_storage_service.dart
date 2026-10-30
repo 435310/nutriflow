@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/anamnesis.dart';
 import '../models/chat_message.dart';
 import '../models/meal.dart';
 import '../models/nutritionist_profile.dart';
@@ -26,6 +27,8 @@ class LocalStorageService {
   static const String _keySymptoms = 'symptom_reports';
   static const String _keyChat = 'chat_messages';
   static const String _keySyncQueue = 'sync_queue';
+  static const String _keyAnamnesis = 'anamnesis';
+  // Catálogo de alimentos (TACO): dado público, sem escopo de usuário
   static const String _keyFoodCatalog = 'food_catalog';
   static const String _keyFoodCatalogUpdatedAt = 'food_catalog_updated_at';
 
@@ -337,6 +340,64 @@ class LocalStorageService {
   }
 
   // ============================================
+  // ANAMNESE
+  // ============================================
+  Future<bool> saveAnamnesis(Anamnesis anamnesis) async {
+    try {
+      final prefs = await _prefs();
+      return await prefs.setString(_k(_keyAnamnesis), jsonEncode(_anamnesisToJson(anamnesis)));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Anamnesis?> loadAnamnesis() async {
+    try {
+      final prefs = await _prefs();
+      final jsonString = prefs.getString(_k(_keyAnamnesis));
+      if (jsonString == null) return null;
+      return _anamnesisFromJson(jsonDecode(jsonString) as Map<String, dynamic>);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ============================================
+  // CATÁLOGO DE ALIMENTOS (TACO)
+  // ============================================
+  Future<bool> saveFoodCatalog(List<Map<String, dynamic>> foods) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyFoodCatalogUpdatedAt, DateTime.now().toIso8601String());
+      return await prefs.setString(_keyFoodCatalog, jsonEncode(foods));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> loadFoodCatalog() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_keyFoodCatalog);
+      if (jsonString == null) return [];
+      final list = jsonDecode(jsonString) as List<dynamic>;
+      return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<DateTime?> foodCatalogUpdatedAt() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final value = prefs.getString(_keyFoodCatalogUpdatedAt);
+      return value == null ? null : DateTime.parse(value);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ============================================
   // FILA DE SINCRONIZAÇÃO
   // ============================================
   Future<List<SyncOperation>> loadSyncOperations() async {
@@ -378,42 +439,6 @@ class LocalStorageService {
     await prefs.clear();
   }
 
-  // ============================================
-  // CATÁLOGO DE ALIMENTOS (TACO)
-  // Dados públicos: ficam sem escopo de usuário
-  // ============================================
-  Future<bool> saveFoodCatalog(List<Map<String, dynamic>> foods) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyFoodCatalogUpdatedAt, DateTime.now().toIso8601String());
-      return await prefs.setString(_keyFoodCatalog, jsonEncode(foods));
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> loadFoodCatalog() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_keyFoodCatalog);
-      if (jsonString == null) return [];
-      final list = jsonDecode(jsonString) as List<dynamic>;
-      return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<DateTime?> foodCatalogUpdatedAt() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final value = prefs.getString(_keyFoodCatalogUpdatedAt);
-      return value == null ? null : DateTime.parse(value);
-    } catch (e) {
-      return null;
-    }
-  }
-  
   // ============================================
   // CONVERSORES
   // ============================================
@@ -463,6 +488,30 @@ class LocalStorageService {
 
   Map<String, dynamic> _symptomToJson(SymptomReport s) => {'id': s.id, 'date': s.date.toIso8601String(), 'symptoms': s.symptoms, 'difficulties': s.difficulties, 'notes': s.notes};
   SymptomReport _symptomFromJson(Map<String, dynamic> json) => SymptomReport(id: json['id'], date: DateTime.parse(json['date']), symptoms: (json['symptoms'] as List).cast<String>(), difficulties: (json['difficulties'] as List).cast<String>(), notes: json['notes']);
+
+  Map<String, dynamic> _anamnesisToJson(Anamnesis a) => {
+    'id': a.id, 'patientId': a.patientId, 'mainGoal': a.mainGoal,
+    'healthConditions': a.healthConditions, 'medications': a.medications,
+    'supplements': a.supplements, 'bowelHabits': a.bowelHabits,
+    'sleepQuality': a.sleepQuality, 'waterIntake': a.waterIntake,
+    'alcoholConsumption': a.alcoholConsumption, 'smoking': a.smoking,
+    'physicalActivity': a.physicalActivity, 'foodAllergies': a.foodAllergies,
+    'foodIntolerances': a.foodIntolerances, 'dietaryPreferences': a.dietaryPreferences,
+    'createdAt': a.createdAt.toIso8601String(),
+    'updatedAt': a.updatedAt?.toIso8601String(),
+  };
+
+  Anamnesis _anamnesisFromJson(Map<String, dynamic> json) => Anamnesis(
+    id: json['id'], patientId: json['patientId'], mainGoal: json['mainGoal'],
+    healthConditions: json['healthConditions'], medications: json['medications'],
+    supplements: json['supplements'], bowelHabits: json['bowelHabits'],
+    sleepQuality: json['sleepQuality'], waterIntake: json['waterIntake'],
+    alcoholConsumption: json['alcoholConsumption'], smoking: json['smoking'],
+    physicalActivity: json['physicalActivity'], foodAllergies: json['foodAllergies'],
+    foodIntolerances: json['foodIntolerances'], dietaryPreferences: json['dietaryPreferences'],
+    createdAt: DateTime.parse(json['createdAt']),
+    updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+  );
 
   Map<String, dynamic> _chatMessageToJson(ChatMessage m) => {'id': m.id, 'text': m.text, 'timestamp': m.timestamp.toIso8601String(), 'isFromPatient': m.isFromPatient, 'isRead': m.isRead};
   ChatMessage _chatMessageFromJson(Map<String, dynamic> json) => ChatMessage(id: json['id'], text: json['text'], timestamp: DateTime.parse(json['timestamp']), isFromPatient: json['isFromPatient'], isRead: json['isRead'] ?? true);

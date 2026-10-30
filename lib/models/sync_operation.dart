@@ -1,7 +1,7 @@
 /// ============================================
 /// OPERAÇÃO PENDENTE DE SINCRONIZAÇÃO
 /// ============================================
-enum SyncEntity { meal, weight, symptom }
+enum SyncEntity { meal, weight, symptom, profile, anamnesis }
 
 enum SyncAction { upsert, delete }
 

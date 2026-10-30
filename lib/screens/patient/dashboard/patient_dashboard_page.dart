@@ -16,7 +16,7 @@ import '../../../widgets/patient_bottom_nav.dart';
 import '../../../widgets/symptom_card.dart'; 
 import '../meal/register_meal_page.dart';
 import '../../../services/sync_service.dart';
-import '../../../services/food_service.dart'; // IMPORT NECESSÁRIO
+import '../../../services/food_service.dart';
 
 class PatientDashboardPage extends StatefulWidget {
   const PatientDashboardPage({super.key});
@@ -114,7 +114,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
     if (_isSyncing) return;
     _isSyncing = true;
     try {
-      // ⚠️ CORREÇÃO APLICADA AQUI: Baixa o catálogo da TACO
       FoodService().refreshCatalogIfNeeded();
 
       await _syncService.syncAll();
@@ -213,6 +212,71 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                     await Navigator.pushNamed(context, AppRoutes.reportSymptoms);
                     if (mounted) _loadData();
                   },
+                ),
+
+                const SizedBox(height: 16),
+
+                // ATALHO PARA A ANAMNESE (RESTAURADO)
+                InkWell(
+                  onTap: () async {
+                    await Navigator.pushNamed(context, AppRoutes.fillAnamnesis);
+                    if (mounted) _loadData();
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 40,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.assignment_outlined,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Questionário de Anamnese',
+                                style: AppTextStyles.h3.copyWith(fontSize: 16),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Responda para que seu nutricionista te conheça.',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 16),

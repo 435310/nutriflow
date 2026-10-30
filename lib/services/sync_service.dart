@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../core/utils/id_generator.dart';
+import '../models/anamnesis.dart';
 import '../models/meal.dart';
+import '../models/patient_profile.dart';
 import '../models/symptom_report.dart';
 import '../models/sync_operation.dart';
 import '../models/weight_entry.dart';
@@ -79,7 +81,7 @@ class SyncService {
       if (!await _local.deleteMeal(id)) return false;
       // Ids antigos (não-UUID) nunca existiram na nuvem: não há o que apagar lá
       if (IdGenerator.isUuid(id)) await _enqueue(SyncEntity.meal, id, SyncAction.delete);
-    return true;
+      return true;
     });
     if (!done) return SyncStatus.localFailed;
 
@@ -119,7 +121,7 @@ class SyncService {
     final done = await _withLock(() async {
       if (!await _local.deleteWeight(id)) return false;
       if (IdGenerator.isUuid(id)) await _enqueue(SyncEntity.weight, id, SyncAction.delete);
-    return true;
+      return true;
     });
     if (!done) return SyncStatus.localFailed;
 
@@ -148,6 +150,68 @@ class SyncService {
     if (!saved) return SyncStatus.localFailed;
 
     return _pushAndReport(SyncEntity.symptom, normalized.id);
+  }
+
+  // ============================================
+  // PERFIL DO PACIENTE
+  // ============================================
+  Future<SyncStatus> saveProfile(PatientProfile profile) async {
+    final userId = _auth.currentUser?.id;
+    if (userId == null) return SyncStatus.localFailed;
+
+    final saved = await _withLock(() async {
+      if (!await _local.saveProfile(profile)) return false;
+      await _enqueue(SyncEntity.profile, userId, SyncAction.upsert);
+      return true;
+    });
+    if (!saved) return SyncStatus.localFailed;
+
+    return _pushAndReport(SyncEntity.profile, userId);
+  }
+
+  /// Traz o perfil da nuvem, a menos que haja uma edição local ainda não enviada.
+  Future<void> pullProfile() async {
+    if (!_auth.isLoggedIn) return;
+    final result = await _auth.pullProfile();
+    final profile = result.data;
+    if (!result.ok || profile == null) return;
+
+    await _withLock(() async {
+      final ops = await _local.loadSyncOperations();
+      if (ops.any((o) => o.entity == SyncEntity.profile)) return;
+      await _local.saveProfile(profile);
+    });
+  }
+
+  // ============================================
+  // ANAMNESE
+  // ============================================
+  Future<SyncStatus> saveAnamnesis(Anamnesis anamnesis) async {
+    final userId = _auth.currentUser?.id;
+    if (userId == null) return SyncStatus.localFailed;
+
+    final saved = await _withLock(() async {
+      if (!await _local.saveAnamnesis(anamnesis)) return false;
+      await _enqueue(SyncEntity.anamnesis, userId, SyncAction.upsert);
+      return true;
+    });
+    if (!saved) return SyncStatus.localFailed;
+
+    return _pushAndReport(SyncEntity.anamnesis, userId);
+  }
+
+  /// Traz a anamnese da nuvem, a menos que haja uma edição local ainda não enviada.
+  Future<void> pullAnamnesis() async {
+    if (!_auth.isLoggedIn) return;
+    final result = await _auth.pullAnamnesis();
+    final anamnesis = result.data;
+    if (!result.ok || anamnesis == null) return;
+
+    await _withLock(() async {
+      final ops = await _local.loadSyncOperations();
+      if (ops.any((o) => o.entity == SyncEntity.anamnesis)) return;
+      await _local.saveAnamnesis(anamnesis);
+    });
   }
 
   // ============================================
@@ -229,6 +293,16 @@ class SyncService {
         final report = (await _local.loadSymptomReports()).where((r) => r.id == op.entityId).firstOrNull;
         if (report == null) return CloudResult<bool>.success(true);
         return _auth.pushSymptom(report);
+
+      case SyncEntity.profile:
+        final profile = await _local.loadProfile();
+        if (profile == null) return CloudResult<bool>.success(true);
+        return _auth.pushProfile(profile);
+
+      case SyncEntity.anamnesis:
+        final anamnesis = await _local.loadAnamnesis();
+        if (anamnesis == null) return CloudResult<bool>.success(true);
+        return _auth.pushAnamnesis(anamnesis);
     }
   }
 
@@ -262,6 +336,10 @@ class SyncService {
       }
       if (symptoms.ok) await _mergeSymptoms(symptoms.data ?? [], skip: idsOf(SyncEntity.symptom));
     });
+
+    // Fora do lock: cada um deles toma o lock por conta própria.
+    await pullProfile();
+    await pullAnamnesis();
   }
 
   /// Nuvem vence, exceto para itens com operação pendente (o que o usuário
@@ -292,8 +370,12 @@ class SyncService {
     final local = await _local.loadWeights();
     final byDay = <DateTime, WeightEntry>{};
 
+    final cloudIds = cloud.map((c) => c.id).toSet();
     for (final w in local) {
-      if (!pendingUpserts.contains(w.id)) byDay[day(w.date)] = w;
+      // se a nuvem tem a mesma linha, a versão da nuvem substitui a local
+      if (!pendingUpserts.contains(w.id) && !cloudIds.contains(w.id)) {
+        byDay[day(w.date)] = w;
+      }
     }
     for (final c in cloud) {
       if (!pendingDeletes.contains(c.id)) byDay[day(c.date)] = c;

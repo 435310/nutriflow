@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/routes.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
-import '../../../services/auth_service.dart';
+import '../../../services/local_storage_service.dart';
+import '../../../services/sync_service.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
-/// TELA: PERFIL DO PACIENTE (Nuvem)
+/// TELA: PERFIL DO PACIENTE (Offline-first)
 /// ============================================
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -34,7 +34,9 @@ class _ProfilePageState extends State<ProfilePage>
   late Animation<double> _buttonFade;
   late Animation<Offset> _buttonSlide;
 
-  final _authService = AuthService();
+  final _localStorage = LocalStorageService();
+  final _syncService = SyncService();
+
   PatientProfile? _profile;
   bool _isLoading = true;
 
@@ -92,81 +94,23 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   // ============================================
-  // CARREGAR PERFIL DO SUPABASE
+  // CARREGAR PERFIL (local na hora, nuvem em seguida)
   // ============================================
   Future<void> _loadProfile() async {
-    try {
-      final cloudProfile = await _authService.getPatientProfile();
-      if (!mounted) return;
+    await _showLocalProfile();
+    await _syncService.syncAll();
+    if (!mounted) return;
+    await _showLocalProfile(fallbackToMock: true);
+  }
 
+  /// Mostra o perfil guardado no aparelho. Sem cópia local, a tela continua
+  /// carregando até a sincronização terminar (evita mostrar dados de exemplo).
+  Future<void> _showLocalProfile({bool fallbackToMock = false}) async {
+    final local = await _localStorage.loadProfile();
+    if (!mounted) return;
+    if (local != null || fallbackToMock) {
       setState(() {
-        if (cloudProfile != null) {
-          // Converte o sexo
-          Gender? gender;
-          if (cloudProfile['gender'] != null) {
-            gender = Gender.values.firstWhere(
-              (e) => e.name == cloudProfile['gender'],
-              orElse: () => Gender.other,
-            );
-          }
-
-          // Converte a data de nascimento
-          DateTime? birthDate;
-          if (cloudProfile['birth_date'] != null) {
-            birthDate = DateTime.parse(cloudProfile['birth_date']);
-          }
-
-          // Converte o objetivo
-          Goal? goal;
-          if (cloudProfile['goal'] != null) {
-            goal = Goal.values.firstWhere(
-              (e) => e.name == cloudProfile['goal'],
-              orElse: () => Goal.maintain,
-            );
-          }
-
-          // Converte a atividade
-          ActivityLevel? activityLevel;
-          if (cloudProfile['activity_level'] != null) {
-            activityLevel = ActivityLevel.values.firstWhere(
-              (e) => e.name == cloudProfile['activity_level'],
-              orElse: () => ActivityLevel.sedentary,
-            );
-          }
-
-          // ⚠️ Converte as listas do banco
-          final restrictions = (cloudProfile['food_restrictions'] as List<dynamic>?)
-                  ?.cast<String>() ??
-              [];
-          final allergies =
-              (cloudProfile['allergies'] as List<dynamic>?)?.cast<String>() ?? [];
-
-          _profile = PatientProfile.mock().copyWith(
-            name: cloudProfile['name'] as String?,
-            email: cloudProfile['email'] as String?,
-            phone: cloudProfile['phone'] as String?,
-            birthDate: birthDate,
-            gender: gender,
-            heightCm: (cloudProfile['height_cm'] as num?)?.toDouble(),
-            currentWeightKg: (cloudProfile['current_weight_kg'] as num?)?.toDouble(),
-            initialWeightKg: (cloudProfile['initial_weight_kg'] as num?)?.toDouble(),
-            goalWeightKg: (cloudProfile['goal_weight_kg'] as num?)?.toDouble(),
-            waistCm: (cloudProfile['waist_cm'] as num?)?.toDouble(),
-            goal: goal,
-            activityLevel: activityLevel,
-            foodRestrictions: restrictions,
-            allergies: allergies,
-          );
-        } else {
-          _profile = PatientProfile.mock();
-        }
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Erro ao carregar perfil: $e');
-      if (!mounted) return;
-      setState(() {
-        _profile = PatientProfile.mock();
+        _profile = local ?? _profile ?? PatientProfile.mock();
         _isLoading = false;
       });
     }
@@ -235,7 +179,7 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 FadeTransition(
                   opacity: _card1Fade,
                   child: SlideTransition(
@@ -252,7 +196,7 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 FadeTransition(
                   opacity: _card2Fade,
                   child: SlideTransition(
@@ -284,7 +228,7 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 FadeTransition(
                   opacity: _card3Fade,
                   child: SlideTransition(
@@ -300,7 +244,7 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 FadeTransition(
                   opacity: _buttonFade,
                   child: SlideTransition(
@@ -308,7 +252,7 @@ class _ProfilePageState extends State<ProfilePage>
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         await Navigator.pushNamed(context, AppRoutes.editProfile);
-                        _loadProfile(); // ⚠️ Recarrega do banco ao voltar
+                        _loadProfile(); // Recarrega ao voltar
                       },
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Editar perfil'),

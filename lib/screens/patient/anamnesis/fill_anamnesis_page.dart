@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
-import '../../../core/theme/text_styles.dart';
+import '../../../core/utils/id_generator.dart';
 import '../../../models/anamnesis.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/local_storage_service.dart';
+import '../../../services/sync_service.dart';
 
 /// ============================================
-/// TELA: PREENCHER ANAMNESE (Paciente)
+/// TELA: PREENCHER ANAMNESE (Paciente, offline-first)
 /// ============================================
 class FillAnamnesisPage extends StatefulWidget {
   const FillAnamnesisPage({super.key});
@@ -19,6 +21,9 @@ class FillAnamnesisPage extends StatefulWidget {
 class _FillAnamnesisPageState extends State<FillAnamnesisPage> {
   final _formKey = GlobalKey<FormState>();
   final _authService = AuthService();
+  final _localStorage = LocalStorageService();
+  final _syncService = SyncService();
+  Anamnesis? _existing;
 
   // Controllers
   final _mainGoalController = TextEditingController();
@@ -62,14 +67,21 @@ class _FillAnamnesisPageState extends State<FillAnamnesisPage> {
     super.dispose();
   }
 
+  // ============================================
+  // CARREGAR (local primeiro; nuvem se ainda não houver cópia local)
+  // ============================================
   Future<void> _loadAnamnesis() async {
     try {
-      final user = _authService.currentUser;
-      if (user == null) return;
+      var existing = await _localStorage.loadAnamnesis();
+      if (existing == null) {
+        await _syncService.pullAnamnesis();
+        existing = await _localStorage.loadAnamnesis();
+      }
 
-      final existing = await _authService.getAnamnesis(user.id);
+      if (!mounted) return;
 
       if (existing != null) {
+        _existing = existing;
         _mainGoalController.text = existing.mainGoal ?? '';
         _healthConditionsController.text = existing.healthConditions ?? '';
         _medicationsController.text = existing.medications ?? '';
@@ -87,19 +99,35 @@ class _FillAnamnesisPageState extends State<FillAnamnesisPage> {
 
       setState(() => _isLoading = false);
     } catch (e) {
-      print('Erro ao carregar anamnese: $e');
+      debugPrint('Erro ao carregar anamnese: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // ============================================
+  // SALVAR (LOCAL -> FILA -> NUVEM)
+  // ============================================
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final userId = _authService.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sessão expirada. Entre novamente.'),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
+    final now = DateTime.now();
     final anamnesis = Anamnesis(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      patientId: _authService.currentUser!.id,
+      id: _existing?.id ?? IdGenerator.uuid(),
+      patientId: userId,
       mainGoal: _mainGoalController.text.trim(),
       healthConditions: _healthConditionsController.text.trim(),
       medications: _medicationsController.text.trim(),
@@ -113,34 +141,40 @@ class _FillAnamnesisPageState extends State<FillAnamnesisPage> {
       foodAllergies: _foodAllergiesController.text.trim(),
       foodIntolerances: _foodIntolerancesController.text.trim(),
       dietaryPreferences: _dietaryPreferencesController.text.trim(),
-      createdAt: DateTime.now(),
+      createdAt: _existing?.createdAt ?? now,
+      updatedAt: now,
     );
 
-    final error = await _authService.saveAnamnesis(anamnesis);
+    final status = await _syncService.saveAnamnesis(anamnesis);
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (error == null) {
+    if (status == SyncStatus.localFailed) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Anamnese salva com sucesso!'),
-          backgroundColor: AppColors.success,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) AppRoutes.back(context);
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
+          content: Text('Não foi possível salvar a anamnese. Tente novamente.'),
           backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
+      return;
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          status == SyncStatus.synced
+              ? 'Anamnese salva com sucesso!'
+              : 'Anamnese salva no aparelho! Será enviada quando houver conexão.',
+        ),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) AppRoutes.back(context);
+    });
   }
 
   @override
