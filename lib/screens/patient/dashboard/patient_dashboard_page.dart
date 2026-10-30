@@ -216,7 +216,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
 
                 const SizedBox(height: 16),
 
-                // ATALHO PARA A ANAMNESE (RESTAURADO)
+                // ATALHO PARA A ANAMNESE
                 InkWell(
                   onTap: () async {
                     await Navigator.pushNamed(context, AppRoutes.fillAnamnesis);
@@ -264,6 +264,71 @@ class _PatientDashboardPageState extends State<PatientDashboardPage>
                               const SizedBox(height: 2),
                               Text(
                                 'Responda para que seu nutricionista te conheça.',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ATALHO PARA O CHAT (RESTAURADO)
+                InkWell(
+                  onTap: () async {
+                    await Navigator.pushNamed(context, AppRoutes.patientChat);
+                    if (mounted) _loadData();
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 40,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.chat_bubble_outline,
+                            color: AppColors.secondary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Falar com a Nutricionista',
+                                style: AppTextStyles.h3.copyWith(fontSize: 16),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Tire dúvidas sobre o seu plano',
                                 style: AppTextStyles.caption,
                               ),
                             ],

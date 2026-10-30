@@ -26,6 +26,11 @@ class AuthService {
     required bool isNutritionist,
   }) async {
     try {
+      // 1. BLOQUEIO DE SEGURANÇA: Cadastro de nutricionista pelo app está desativado
+      if (isNutritionist) {
+        return 'O cadastro de nutricionistas exige aprovação administrativa. Entre em contato com o administrador.';
+      }
+
       final response = await _supabase.auth.signUp(
         email: email.trim(),
         password: password,
@@ -34,23 +39,13 @@ class AuthService {
       final user = response.user;
       if (user == null) return 'Erro ao criar usuário.';
 
-      if (isNutritionist) {
-        await _supabase.from('nutritionist_profiles').insert({
-          'id': user.id,
-          'user_id': user.id,
-          'name': name.trim(),
-          'email': email.trim(),
-          'crn': 'A preencher',
-          'specialty': 'A preencher',
-        });
-      } else {
-        await _supabase.from('patient_profiles').insert({
-          'id': user.id,
-          'user_id': user.id,
-          'name': name.trim(),
-          'email': email.trim(),
-        });
-      }
+      // 2. Cria apenas o perfil de paciente
+      await _supabase.from('patient_profiles').insert({
+        'id': user.id,
+        'user_id': user.id,
+        'name': name.trim(),
+        'email': email.trim(),
+      });
 
       return null;
     } on AuthException catch (e) {
@@ -188,11 +183,6 @@ class AuthService {
         'calories': f.calories,
       }).toList();
 
-      print('═══════════════════════════════════');
-      print('SALVANDO REFEIÇÃO: ${meal.type.label}');
-      print('ALIMENTOS: $foodsJson');
-      print('═══════════════════════════════════');
-
       await _supabase.from('meal_entries').insert({
         'patient_id': user.id,
         'type': meal.type.name,
@@ -204,10 +194,7 @@ class AuthService {
 
       return null;
     } catch (e, stacktrace) {
-      print('═══════════════════════════════════');
-      print('ERRO AO SALVAR REFEIÇÃO: $e');
-      print('STACKTRACE: $stacktrace');
-      print('═══════════════════════════════════');
+      print('Erro ao salvar refeição: $e');
       return 'Erro ao salvar refeição: $e';
     }
   }
@@ -392,16 +379,44 @@ class AuthService {
   }
 
   // ============================================
-  // CHAT
+  // CHAT (ATUALIZADO PARA O NOVO MODELO DE SEGURANÇA)
   // ============================================
-  Future<String?> sendMessageToCloud(String text, {required bool isFromPatient}) async {
+  Future<String?> sendMessageToCloud(
+    String text, {
+    required bool isFromPatient,
+    String? patientId, // Obrigatório se quem envia for nutricionista
+  }) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return 'Usuário não logado';
 
+      String? receiverId;
+
+      if (isFromPatient) {
+        // O paciente envia para o seu nutricionista vinculado
+        final profile = await _supabase
+            .from('patient_profiles')
+            .select('nutritionist_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        receiverId = profile?['nutritionist_id'] as String?;
+
+        if (receiverId == null) {
+          return 'Você ainda não possui um nutricionista vinculado.';
+        }
+      } else {
+        // O nutricionista envia para o paciente selecionado
+        receiverId = patientId;
+
+        if (receiverId == null) {
+          return 'Selecione um paciente para enviar a mensagem.';
+        }
+      }
+
       await _supabase.from('chat_messages').insert({
         'sender_id': user.id,
-        'receiver_id': '00000000-0000-0000-0000-000000000000',
+        'receiver_id': receiverId,
         'text': text,
         'is_from_patient': isFromPatient,
         'is_read': false,
@@ -440,10 +455,14 @@ class AuthService {
 
   Future<int> countUnreadMessagesFromCloud({required bool forNutritionist}) async {
     try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 0;
+
+      // Filtra apenas as mensagens onde EU sou o destinatário e não estão lidas
       final response = await _supabase
           .from('chat_messages')
           .select('id')
-          .eq('is_from_patient', forNutritionist)
+          .eq('receiver_id', user.id)
           .eq('is_read', false);
       
       return (response as List).length;
@@ -455,10 +474,14 @@ class AuthService {
 
   Future<void> markMessagesAsReadInCloud({required bool byNutritionist}) async {
     try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      // Marca como lidas apenas as mensagens onde EU sou o destinatário
       await _supabase
           .from('chat_messages')
           .update({'is_read': true})
-          .eq('is_from_patient', byNutritionist)
+          .eq('receiver_id', user.id)
           .eq('is_read', false);
     } catch (e) {
       print('Erro ao marcar mensagens como lidas: $e');
@@ -466,10 +489,14 @@ class AuthService {
   }
 
   Stream<int> watchUnreadMessages({required bool forNutritionist}) {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return Stream.value(0);
+
+    // Escuta em tempo real apenas mensagens para mim
     return _supabase
         .from('chat_messages')
         .stream(primaryKey: ['id'])
-        .eq('is_from_patient', forNutritionist)
+        .eq('receiver_id', user.id)
         .eq('is_read', false)
         .map((list) => list.length);
   }
@@ -629,13 +656,23 @@ class AuthService {
   // ============================================
   Future<List<Map<String, dynamic>>> getAllPatients() async {
     try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return [];
+
+      // Verifica se realmente é nutricionista
+      final isNutri = await isNutritionist();
+      if (!isNutri) return [];
+
+      // Busca apenas os pacientes vinculados a este nutricionista
       final response = await _supabase
           .from('patient_profiles')
           .select()
+          .eq('nutritionist_id', user.id) // <--- A MÁGICA ACONTECE AQUI
           .order('name', ascending: true);
+
       return response;
     } catch (e) {
-      print('Erro ao buscar pacientes: $e');
+      print('Erro ao buscar pacientes vinculados: $e');
       return [];
     }
   }
