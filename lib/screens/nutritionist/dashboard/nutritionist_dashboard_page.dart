@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
 import '../../../core/theme/colors.dart';
@@ -13,7 +12,7 @@ import '../../../widgets/status_count_chip.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
-/// TELA: DASHBOARD DO NUTRICIONISTA (Nuvem)
+/// TELA: DASHBOARD DO NUTRICIONISTA (Seguro)
 /// ============================================
 class NutritionistDashboardPage extends StatefulWidget {
   const NutritionistDashboardPage({super.key});
@@ -32,7 +31,7 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
   
   int _currentNavIndex = 0;
   int _unreadMessages = 0;
-  String _nutritionistName = 'Nutricionista';
+  String _nutritionistName = 'Nutricionista'; // Nome será atualizado depois
   
   int _totalPatients = 0;
   List<PatientSummary> _recentPatients = [];
@@ -73,18 +72,7 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
 
   Future<void> _loadDashboardData() async {
     try {
-      final user = _authService.currentUser;
-      if (user != null) {
-        final nutriProfile = await Supabase.instance.client
-            .from('nutritionist_profiles')
-            .select('name')
-            .eq('user_id', user.id)
-            .maybeSingle();
-        if (nutriProfile != null) {
-          _nutritionistName = nutriProfile['name'] as String? ?? 'Nutricionista';
-        }
-      }
-
+      // Pega apenas os pacientes vinculados a esta nutricionista
       final patientsData = await _authService.getAllPatients();
       _totalPatients = patientsData.length;
       
@@ -117,23 +105,12 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
     if (index == 1) {
       await Navigator.pushNamed(context, AppRoutes.nutritionistPatients);
     } else if (index == 2) {
-      // ⚠️ Vai para Mensagens e espera o retorno
       await Navigator.pushNamed(context, AppRoutes.nutritionistMessages);
     } else if (index == 3) {
       await Navigator.pushNamed(context, AppRoutes.nutritionistProfile);
     }
 
-    // ⚠️ Atualiza o badge SEMPRE que voltar de qualquer aba
     _loadUnreadMessages();
-  }
-
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature em breve'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
   }
 
   String _getGreeting() {
@@ -164,19 +141,16 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-
                 const SizedBox(height: 28),
 
                 PatientSummaryCard(
                   total: _totalPatients,
-                  label: 'Pacientes ativos',
+                  label: 'Pacientes vinculados',
                   onTap: () => _handleNavTap(1),
                 ),
 
                 const SizedBox(height: 20),
-
                 Text('Status dos pacientes', style: AppTextStyles.h3),
-
                 const SizedBox(height: 14),
 
                 Row(
@@ -193,7 +167,7 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
                       child: StatusCountChip(
                         status: PatientStatus.attention,
                         count: 0,
-                        onTap: () => _showComingSoon('Filtro: Atenção'),
+                        onTap: () {},
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -201,7 +175,7 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
                       child: StatusCountChip(
                         status: PatientStatus.noInteraction,
                         count: 0,
-                        onTap: () => _showComingSoon('Filtro: Sem interação'),
+                        onTap: () {},
                       ),
                     ),
                   ],
@@ -248,15 +222,6 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
           ),
         ),
       ),
-
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showComingSoon('Novo paciente'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Novo paciente'),
-      ),
-
       bottomNavigationBar: NutritionistBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,
@@ -266,16 +231,11 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
   }
 
   Widget _buildHeader() {
-    final displayName = _nutritionistName.startsWith('Dra.') || _nutritionistName.startsWith('Dr.')
-        ? _nutritionistName
-        : 'Dra. $_nutritionistName';
+    final displayName = _nutritionistName.startsWith('Dra.') || _nutritionistName.startsWith('Dr.') ? _nutritionistName : 'Dra. $_nutritionistName';
 
     return Row(
       children: [
-        UserAvatar(
-          name: _nutritionistName,
-          size: UserAvatarSize.medium,
-        ),
+        UserAvatar(name: _nutritionistName, size: UserAvatarSize.medium),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -294,28 +254,6 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
               ),
             ],
           ),
-        ),
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              height: 44,
-              width: 44,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.notifications_outlined,
-                  color: AppColors.textPrimary,
-                  size: 22,
-                ),
-                onPressed: () => _showComingSoon('Notificações'),
-              ),
-            ),
-          ],
         ),
       ],
     );
@@ -339,24 +277,12 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
               color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(
-              Icons.people_outline,
-              size: 36,
-              color: AppColors.primary,
-            ),
+            child: const Icon(Icons.people_outline, size: 36, color: AppColors.primary),
           ),
           const SizedBox(height: 20),
-          Text(
-            'Nenhum paciente cadastrado',
-            style: AppTextStyles.h3,
-            textAlign: TextAlign.center,
-          ),
+          Text('Nenhum paciente vinculado', style: AppTextStyles.h3, textAlign: TextAlign.center),
           const SizedBox(height: 8),
-          Text(
-            'Comece adicionando seu primeiro paciente.',
-            style: AppTextStyles.bodySecondary,
-            textAlign: TextAlign.center,
-          ),
+          Text('Peça ao administrador para vincular um paciente.', style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
         ],
       ),
     );
