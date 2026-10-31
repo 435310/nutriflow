@@ -24,7 +24,7 @@ class AuthService {
     required String email,
     required String password,
     required bool isNutritionist,
-    String? crn, // NOVO: Parâmetro para o CRN do nutricionista
+    String? crn,
   }) async {
     try {
       final response = await _supabase.auth.signUp(
@@ -36,7 +36,6 @@ class AuthService {
       if (user == null) return 'Erro ao criar usuário.';
 
       if (isNutritionist) {
-        // Cria o perfil como PENDENTE (is_approved = false)
         await _supabase.from('nutritionist_profiles').insert({
           'id': user.id,
           'user_id': user.id,
@@ -44,7 +43,7 @@ class AuthService {
           'email': email.trim(),
           'crn': crn?.trim() ?? 'A preencher',
           'specialty': 'A preencher',
-          'is_approved': false, // <--- A MÁGICA ACONTECE AQUI
+          'is_approved': false,
         });
       } else {
         await _supabase.from('patient_profiles').insert({
@@ -79,14 +78,12 @@ class AuthService {
       final user = authResponse.user;
       if (user == null) return 'Erro ao fazer login.';
 
-      // Verifica se é nutricionista
       final nutriProfile = await _supabase
           .from('nutritionist_profiles')
           .select('is_approved')
           .eq('user_id', user.id)
           .maybeSingle();
 
-      // Se for nutricionista e NÃO estiver aprovado, desloga e avisa!
       if (nutriProfile != null && nutriProfile['is_approved'] == false) {
         await _supabase.auth.signOut();
         return 'Sua solicitação está em análise. Você receberá um e-mail em até 24h assim que seu CRN for verificado.';
@@ -751,6 +748,65 @@ class AuthService {
     } catch (e) {
       print('Erro ao buscar pesos do paciente: $e');
       return [];
+    }
+  }
+
+  // ============================================
+  // CONVITE DE PACIENTE (NUTRICIONISTA)
+  // ============================================
+  Future<String?> getInviteCode() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return null;
+
+      var response = await _supabase
+          .from('nutritionist_profiles')
+          .select('invite_code')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      if (response == null || response['invite_code'] == null) {
+        final newCode = await _supabase.rpc('generate_invite_code');
+        await _supabase
+            .from('nutritionist_profiles')
+            .update({'invite_code': newCode})
+            .eq('user_id', user.id);
+        return newCode as String;
+      }
+
+      return response['invite_code'] as String;
+    } catch (e) {
+      print('Erro ao gerar código de convite: $e');
+      return null;
+    }
+  }
+
+  // ============================================
+  // VINCULAR PACIENTE (PACIENTE USA O CÓDIGO)
+  // ============================================
+  Future<String?> linkPatientToNutritionist(String code) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 'Usuário não logado';
+
+      final nutriProfile = await _supabase
+          .from('nutritionist_profiles')
+          .select('id, name')
+          .eq('invite_code', code.trim().toUpperCase())
+          .maybeSingle();
+
+      if (nutriProfile == null) {
+        return 'Código de convite inválido. Verifique e tente novamente.';
+      }
+
+      await _supabase.from('patient_profiles').update({
+        'nutritionist_id': nutriProfile['id'],
+      }).eq('user_id', user.id);
+
+      return 'Vinculado com sucesso à ${nutriProfile['name']}!';
+    } catch (e) {
+      print('Erro ao vincular paciente: $e');
+      return 'Erro ao vincular: $e';
     }
   }
 }
