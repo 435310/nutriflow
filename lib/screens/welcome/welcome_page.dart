@@ -6,7 +6,7 @@ import '../../core/theme/colors.dart';
 import '../../core/theme/text_styles.dart';
 
 /// ============================================
-/// TELA: BOAS-VINDAS (com animações)
+/// TELA: BOAS-VINDAS (com animações) - Centralizada
 /// ============================================
 class WelcomePage extends StatefulWidget {
   const WelcomePage({super.key});
@@ -43,15 +43,11 @@ class _WelcomePageState extends State<WelcomePage>
   void initState() {
     super.initState();
 
-    // ============================================
-    // ANIMAÇÃO DE ENTRADA (1.4s total)
-    // ============================================
     _entryController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
 
-    // Logo — fade + scale + leve rotação
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryController,
@@ -71,7 +67,6 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // Ícone interno
     _iconFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryController,
@@ -85,7 +80,6 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // Título
     _titleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryController,
@@ -102,7 +96,6 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // Subtítulo
     _subtitleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryController,
@@ -119,7 +112,6 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // Botão Entrar
     _loginButtonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryController,
@@ -136,7 +128,6 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // Botão Criar conta
     _signupButtonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _entryController,
@@ -153,9 +144,6 @@ class _WelcomePageState extends State<WelcomePage>
       ),
     );
 
-    // ============================================
-    // PULSE DO LOGO (contínuo)
-    // ============================================
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -188,6 +176,7 @@ class _WelcomePageState extends State<WelcomePage>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        // O gradiente ocupa a tela inteira
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -199,143 +188,147 @@ class _WelcomePageState extends State<WelcomePage>
             stops: [0.0, 0.5],
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(),
+        // O Center centraliza o conteúdo
+        child: Center(
+          // O ConstrainedBox limita a largura a 450px
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 450),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Spacer(),
 
-                // ============================================
-                // LOGO ANIMADO
-                // ============================================
-                FadeTransition(
-                  opacity: _logoFade,
-                  child: ScaleTransition(
-                    scale: _logoScale,
-                    child: RotationTransition(
-                      turns: _logoRotation,
-                      child: AnimatedBuilder(
-                        animation: _pulse,
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _pulse.value,
-                            child: child,
-                          );
-                        },
-                        child: Container(
-                          height: 110,
-                          width: 110,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(32),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.25),
-                                blurRadius: 30,
-                                offset: const Offset(0, 12),
+                    // LOGO ANIMADO
+                    FadeTransition(
+                      opacity: _logoFade,
+                      child: ScaleTransition(
+                        scale: _logoScale,
+                        child: RotationTransition(
+                          turns: _logoRotation,
+                          child: AnimatedBuilder(
+                            animation: _pulse,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _pulse.value,
+                                child: child,
+                              );
+                            },
+                            child: Container(
+                              height: 110,
+                              width: 110,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(32),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.25),
+                                    blurRadius: 30,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: FadeTransition(
-                            opacity: _iconFade,
-                            child: ScaleTransition(
-                              scale: _iconScale,
-                              child: const Icon(
-                                Icons.restaurant_menu,
-                                size: 58,
-                                color: Colors.white,
+                              child: FadeTransition(
+                                opacity: _iconFade,
+                                child: ScaleTransition(
+                                  scale: _iconScale,
+                                  child: const Icon(
+                                    Icons.restaurant_menu,
+                                    size: 58,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 48),
+                    const SizedBox(height: 48),
 
-                // ============================================
-                // TÍTULO
-                // ============================================
-                FadeTransition(
-                  opacity: _titleFade,
-                  child: SlideTransition(
-                    position: _titleSlide,
-                    child: const Text(
-                      AppStrings.welcomeTitle,
-                      style: AppTextStyles.h1,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // ============================================
-                // SUBTÍTULO
-                // ============================================
-                FadeTransition(
-                  opacity: _subtitleFade,
-                  child: SlideTransition(
-                    position: _subtitleSlide,
-                    child: const Text(
-                      AppStrings.welcomeSubtitle,
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodySecondary,
-                    ),
-                  ),
-                ),
-
-                const Spacer(),
-
-                // ============================================
-                // BOTÃO ENTRAR
-                // ============================================
-                FadeTransition(
-                  opacity: _loginButtonFade,
-                  child: SlideTransition(
-                    position: _loginButtonSlide,
-                    child: _PressableButton(
-                      onPressed: () {
-                        AppRoutes.go(context, AppRoutes.profileChoice);
-                      },
-                      child: ElevatedButton(
-                        onPressed: () {
-                          AppRoutes.go(context, AppRoutes.profileChoice);
-                        },
-                        child: const Text(AppStrings.welcomeButtonLogin),
+                    // TÍTULO
+                    FadeTransition(
+                      opacity: _titleFade,
+                      child: SlideTransition(
+                        position: _titleSlide,
+                        child: const Text(
+                          AppStrings.welcomeTitle,
+                          style: AppTextStyles.h1,
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                // ============================================
-                // BOTÃO CRIAR CONTA
-                // ============================================
-                FadeTransition(
-                  opacity: _signupButtonFade,
-                  child: SlideTransition(
-                    position: _signupButtonSlide,
-                    child: _PressableButton(
-                      onPressed: () {
-                        AppRoutes.go(context, AppRoutes.profileChoice);
-                      },
-                      child: OutlinedButton(
-                        onPressed: () {
-                          AppRoutes.go(context, AppRoutes.profileChoice);
-                        },
-                        child: const Text(AppStrings.welcomeButtonSignup),
+                    // SUBTÍTULO
+                    FadeTransition(
+                      opacity: _subtitleFade,
+                      child: SlideTransition(
+                        position: _subtitleSlide,
+                        child: const Text(
+                          AppStrings.welcomeSubtitle,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodySecondary,
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-                const SizedBox(height: 48),
-              ],
+                    const Spacer(),
+
+                    // BOTÃO ENTRAR
+                    FadeTransition(
+                      opacity: _loginButtonFade,
+                      child: SlideTransition(
+                        position: _loginButtonSlide,
+                        child: SizedBox(
+                          width: double.infinity, // Botão ocupa toda a largura permitida (450px)
+                          child: _PressableButton(
+                            onPressed: () {
+                              AppRoutes.go(context, AppRoutes.profileChoice);
+                            },
+                            child: ElevatedButton(
+                              onPressed: () {
+                                AppRoutes.go(context, AppRoutes.profileChoice);
+                              },
+                              child: const Text(AppStrings.welcomeButtonLogin),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // BOTÃO CRIAR CONTA
+                    FadeTransition(
+                      opacity: _signupButtonFade,
+                      child: SlideTransition(
+                        position: _signupButtonSlide,
+                        child: SizedBox(
+                          width: double.infinity, // Botão ocupa toda a largura permitida
+                          child: _PressableButton(
+                            onPressed: () {
+                              AppRoutes.go(context, AppRoutes.profileChoice);
+                            },
+                            child: OutlinedButton(
+                              onPressed: () {
+                                AppRoutes.go(context, AppRoutes.profileChoice);
+                              },
+                              child: const Text(AppStrings.welcomeButtonSignup),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 48),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -344,9 +337,6 @@ class _WelcomePageState extends State<WelcomePage>
   }
 }
 
-/// ============================================
-/// WIDGET: BOTÃO COM MICRO-INTERAÇÃO
-/// ============================================
 class _PressableButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onPressed;
