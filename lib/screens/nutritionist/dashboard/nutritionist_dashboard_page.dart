@@ -31,7 +31,7 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
   
   int _currentNavIndex = 0;
   int _unreadMessages = 0;
-  String _nutritionistName = 'Nutricionista'; // Nome será atualizado depois
+  String _nutritionistName = 'Nutricionista';
   
   int _totalPatients = 0;
   List<PatientSummary> _recentPatients = [];
@@ -72,7 +72,6 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
 
   Future<void> _loadDashboardData() async {
     try {
-      // Pega apenas os pacientes vinculados a esta nutricionista
       final patientsData = await _authService.getAllPatients();
       _totalPatients = patientsData.length;
       
@@ -111,6 +110,67 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
     }
 
     _loadUnreadMessages();
+  }
+
+  Future<void> _showInviteCode() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final code = await _authService.getInviteCode();
+
+    if (!mounted) return;
+    Navigator.pop(context);
+
+    if (code != null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Convidar Paciente'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Envie este código para o seu paciente:'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SelectableText(
+                  code,
+                  style: const TextStyle(
+                    fontSize: 32, 
+                    fontWeight: FontWeight.bold, 
+                    letterSpacing: 4, 
+                    color: AppColors.primary
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'O paciente deve inserir este código no perfil dele para se vincular a você.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fechar'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Erro ao gerar código. Tente novamente.'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   String _getGreeting() {
@@ -222,6 +282,13 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showInviteCode,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Convidar Paciente'),
+      ),
       bottomNavigationBar: NutritionistBottomNav(
         currentIndex: _currentNavIndex,
         onTap: _handleNavTap,
@@ -282,7 +349,7 @@ class _NutritionistDashboardPageState extends State<NutritionistDashboardPage>
           const SizedBox(height: 20),
           Text('Nenhum paciente vinculado', style: AppTextStyles.h3, textAlign: TextAlign.center),
           const SizedBox(height: 8),
-          Text('Peça ao administrador para vincular um paciente.', style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
+          Text('Clique em "Convidar Paciente" para gerar um código.', style: AppTextStyles.bodySecondary, textAlign: TextAlign.center),
         ],
       ),
     );

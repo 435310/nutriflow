@@ -6,6 +6,7 @@ import '../../../core/theme/text_styles.dart';
 import '../../../models/patient_profile.dart';
 import '../../../services/local_storage_service.dart';
 import '../../../services/sync_service.dart';
+import '../../../services/auth_service.dart';
 import '../../../widgets/user_avatar.dart';
 
 /// ============================================
@@ -36,6 +37,7 @@ class _ProfilePageState extends State<ProfilePage>
 
   final _localStorage = LocalStorageService();
   final _syncService = SyncService();
+  final _authService = AuthService();
 
   PatientProfile? _profile;
   bool _isLoading = true;
@@ -93,9 +95,6 @@ class _ProfilePageState extends State<ProfilePage>
     super.dispose();
   }
 
-  // ============================================
-  // CARREGAR PERFIL (local na hora, nuvem em seguida)
-  // ============================================
   Future<void> _loadProfile() async {
     await _showLocalProfile();
     await _syncService.syncAll();
@@ -103,8 +102,6 @@ class _ProfilePageState extends State<ProfilePage>
     await _showLocalProfile(fallbackToMock: true);
   }
 
-  /// Mostra o perfil guardado no aparelho. Sem cópia local, a tela continua
-  /// carregando até a sincronização terminar (evita mostrar dados de exemplo).
   Future<void> _showLocalProfile({bool fallbackToMock = false}) async {
     final local = await _localStorage.loadProfile();
     if (!mounted) return;
@@ -114,6 +111,47 @@ class _ProfilePageState extends State<ProfilePage>
         _isLoading = false;
       });
     }
+  }
+
+  void _showInviteCodeDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Vincular Nutricionista'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Código de Convite',
+            hintText: 'Ex: A1B2C3',
+          ),
+          textCapitalization: TextCapitalization.characters,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final result = await _authService.linkPatientToNutritionist(controller.text);
+              
+              if (!mounted) return;
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result ?? 'Erro ao vincular'),
+                  backgroundColor: result?.contains('sucesso') == true ? AppColors.success : AppColors.error,
+                ),
+              );
+              _loadProfile();
+            },
+            child: const Text('Vincular'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -252,10 +290,22 @@ class _ProfilePageState extends State<ProfilePage>
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         await Navigator.pushNamed(context, AppRoutes.editProfile);
-                        _loadProfile(); // Recarrega ao voltar
+                        _loadProfile();
                       },
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Editar perfil'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FadeTransition(
+                  opacity: _buttonFade,
+                  child: SlideTransition(
+                    position: _buttonSlide,
+                    child: OutlinedButton.icon(
+                      onPressed: _showInviteCodeDialog,
+                      icon: const Icon(Icons.link),
+                      label: const Text('Inserir Código de Convite'),
                     ),
                   ),
                 ),
