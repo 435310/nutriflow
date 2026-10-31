@@ -24,10 +24,9 @@ class _SignupPageState extends State<SignupPage>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _crnController = TextEditingController(); // NOVO: Controller do CRN
   
-  // ⚠️ NOVO: Controla se é paciente ou nutricionista
   bool _isNutritionist = false;
-
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptedTerms = false;
@@ -83,6 +82,7 @@ class _SignupPageState extends State<SignupPage>
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _crnController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -123,7 +123,7 @@ class _SignupPageState extends State<SignupPage>
 
     if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppStrings.validationTermsRequired), backgroundColor: AppColors.error, duration: const Duration(seconds: 2)),
+        SnackBar(content: Text(AppStrings.validationTermsRequired), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -137,27 +137,45 @@ class _SignupPageState extends State<SignupPage>
       name: _nameController.text,
       email: _emailController.text,
       password: _passwordController.text,
-      isNutritionist: _isNutritionist, // ⚠️ Usa a escolha do usuário
+      isNutritionist: _isNutritionist,
+      crn: _isNutritionist ? _crnController.text : null,
     );
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
     if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Conta criada com sucesso!'), backgroundColor: AppColors.success, duration: Duration(seconds: 2)),
-      );
+      if (_isNutritionist) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Solicitação Enviada!'),
+            content: const Text(
+              'Sua solicitação foi recebida com sucesso!\n\n'
+              'Nosso time vai verificar seu CRN e liberar seu acesso em até 24 horas.\n\n'
+              'Você receberá um e-mail assim que a aprovação for concluída.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  AppRoutes.back(context);
+                },
+                child: const Text('Entendi'),
+              ),
+            ],
+          ),
+        );
+      } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Conta criada com sucesso!'), backgroundColor: AppColors.success, duration: Duration(seconds: 2)),
+        );
 
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (mounted) {
-          // Redireciona para o Dashboard correto
-          if (_isNutritionist) {
-            AppRoutes.go(context, AppRoutes.nutritionistDashboard);
-          } else {
-            AppRoutes.go(context, AppRoutes.patientDashboard);
-          }
-        }
-      });
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (mounted) AppRoutes.go(context, AppRoutes.patientDashboard);
+        });
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error), backgroundColor: AppColors.error, duration: const Duration(seconds: 3)),
@@ -187,7 +205,7 @@ class _SignupPageState extends State<SignupPage>
                 FadeTransition(opacity: _subtitleFade, child: SlideTransition(position: _subtitleSlide, child: const Text(AppStrings.signupSubtitle, style: AppTextStyles.bodySecondary))),
                 const SizedBox(height: 24),
 
-                // ⚠️ NOVO: SELETOR DE PERFIL
+                // SELETOR DE PERFIL
                 FadeTransition(
                   opacity: _termsFade,
                   child: Row(
@@ -198,10 +216,7 @@ class _SignupPageState extends State<SignupPage>
                           selected: !_isNutritionist,
                           onSelected: (val) => setState(() => _isNutritionist = false),
                           selectedColor: AppColors.primary.withValues(alpha: 0.2),
-                          labelStyle: TextStyle(
-                            color: !_isNutritionist ? AppColors.primary : AppColors.textSecondary,
-                            fontWeight: !_isNutritionist ? FontWeight.bold : FontWeight.normal,
-                          ),
+                          labelStyle: TextStyle(color: !_isNutritionist ? AppColors.primary : AppColors.textSecondary, fontWeight: !_isNutritionist ? FontWeight.bold : FontWeight.normal),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -211,10 +226,7 @@ class _SignupPageState extends State<SignupPage>
                           selected: _isNutritionist,
                           onSelected: (val) => setState(() => _isNutritionist = true),
                           selectedColor: AppColors.secondary.withValues(alpha: 0.2),
-                          labelStyle: TextStyle(
-                            color: _isNutritionist ? AppColors.secondary : AppColors.textSecondary,
-                            fontWeight: _isNutritionist ? FontWeight.bold : FontWeight.normal,
-                          ),
+                          labelStyle: TextStyle(color: _isNutritionist ? AppColors.secondary : AppColors.textSecondary, fontWeight: _isNutritionist ? FontWeight.bold : FontWeight.normal),
                         ),
                       ),
                     ],
@@ -229,6 +241,32 @@ class _SignupPageState extends State<SignupPage>
                 FadeTransition(opacity: _passwordFade, child: SlideTransition(position: _passwordSlide, child: TextFormField(controller: _passwordController, obscureText: _obscurePassword, validator: _validatePassword, decoration: InputDecoration(labelText: AppStrings.signupPasswordLabel, prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => _obscurePassword = !_obscurePassword)))))),
                 const SizedBox(height: 20),
                 FadeTransition(opacity: _confirmFade, child: SlideTransition(position: _confirmSlide, child: TextFormField(controller: _confirmPasswordController, obscureText: _obscureConfirmPassword, validator: _validateConfirmPassword, decoration: InputDecoration(labelText: AppStrings.signupConfirmPasswordLabel, prefixIcon: const Icon(Icons.lock_outline), suffixIcon: IconButton(icon: Icon(_obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined), onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword)))))),
+
+                // CAMPO DE CRN (SÓ APARECE SE FOR NUTRICIONISTA)
+                if (_isNutritionist) ...[
+                  const SizedBox(height: 20),
+                  FadeTransition(
+                    opacity: _emailFade,
+                    child: SlideTransition(
+                      position: _emailSlide,
+                      child: TextFormField(
+                        controller: _crnController,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Por favor, informe seu CRN.';
+                          }
+                          return null;
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'CRN (Ex: CRN-3 12345)',
+                          hintText: 'Informe seu registro profissional',
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 24),
                 
                 FadeTransition(opacity: _termsFade, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Checkbox(value: _acceptedTerms, activeColor: AppColors.primary, onChanged: (v) => setState(() => _acceptedTerms = v ?? false)), Expanded(child: Padding(padding: const EdgeInsets.only(top: 12), child: Text(AppStrings.signupTermsText, style: AppTextStyles.caption.copyWith(height: 1.4))))])),

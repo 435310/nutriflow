@@ -24,13 +24,9 @@ class AuthService {
     required String email,
     required String password,
     required bool isNutritionist,
+    String? crn, // NOVO: Parâmetro para o CRN do nutricionista
   }) async {
     try {
-      // 1. BLOQUEIO DE SEGURANÇA: Cadastro de nutricionista pelo app está desativado
-      if (isNutritionist) {
-        return 'O cadastro de nutricionistas exige aprovação administrativa. Entre em contato com o administrador.';
-      }
-
       final response = await _supabase.auth.signUp(
         email: email.trim(),
         password: password,
@@ -39,13 +35,25 @@ class AuthService {
       final user = response.user;
       if (user == null) return 'Erro ao criar usuário.';
 
-      // 2. Cria apenas o perfil de paciente
-      await _supabase.from('patient_profiles').insert({
-        'id': user.id,
-        'user_id': user.id,
-        'name': name.trim(),
-        'email': email.trim(),
-      });
+      if (isNutritionist) {
+        // Cria o perfil como PENDENTE (is_approved = false)
+        await _supabase.from('nutritionist_profiles').insert({
+          'id': user.id,
+          'user_id': user.id,
+          'name': name.trim(),
+          'email': email.trim(),
+          'crn': crn?.trim() ?? 'A preencher',
+          'specialty': 'A preencher',
+          'is_approved': false, // <--- A MÁGICA ACONTECE AQUI
+        });
+      } else {
+        await _supabase.from('patient_profiles').insert({
+          'id': user.id,
+          'user_id': user.id,
+          'name': name.trim(),
+          'email': email.trim(),
+        });
+      }
 
       return null;
     } on AuthException catch (e) {
@@ -56,17 +64,34 @@ class AuthService {
   }
 
   // ============================================
-  // LOGIN
+  // LOGIN (COM VERIFICAÇÃO DE APROVAÇÃO)
   // ============================================
   Future<String?> signIn({
     required String email,
     required String password,
   }) async {
     try {
-      await _supabase.auth.signInWithPassword(
+      final authResponse = await _supabase.auth.signInWithPassword(
         email: email.trim(),
         password: password,
       );
+
+      final user = authResponse.user;
+      if (user == null) return 'Erro ao fazer login.';
+
+      // Verifica se é nutricionista
+      final nutriProfile = await _supabase
+          .from('nutritionist_profiles')
+          .select('is_approved')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+      // Se for nutricionista e NÃO estiver aprovado, desloga e avisa!
+      if (nutriProfile != null && nutriProfile['is_approved'] == false) {
+        await _supabase.auth.signOut();
+        return 'Sua solicitação está em análise. Você receberá um e-mail em até 24h assim que seu CRN for verificado.';
+      }
+
       return null;
     } on AuthException catch (e) {
       return e.message;
@@ -379,12 +404,12 @@ class AuthService {
   }
 
   // ============================================
-  // CHAT (ATUALIZADO PARA O NOVO MODELO DE SEGURANÇA)
+  // CHAT
   // ============================================
   Future<String?> sendMessageToCloud(
     String text, {
     required bool isFromPatient,
-    String? patientId, // Obrigatório se quem envia for nutricionista
+    String? patientId,
   }) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -393,7 +418,6 @@ class AuthService {
       String? receiverId;
 
       if (isFromPatient) {
-        // O paciente envia para o seu nutricionista vinculado
         final profile = await _supabase
             .from('patient_profiles')
             .select('nutritionist_id')
@@ -406,7 +430,6 @@ class AuthService {
           return 'Você ainda não possui um nutricionista vinculado.';
         }
       } else {
-        // O nutricionista envia para o paciente selecionado
         receiverId = patientId;
 
         if (receiverId == null) {
@@ -458,7 +481,6 @@ class AuthService {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0;
 
-      // Filtra apenas as mensagens onde EU sou o destinatário e não estão lidas
       final response = await _supabase
           .from('chat_messages')
           .select('id')
@@ -477,7 +499,6 @@ class AuthService {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      // Marca como lidas apenas as mensagens onde EU sou o destinatário
       await _supabase
           .from('chat_messages')
           .update({'is_read': true})
@@ -492,7 +513,6 @@ class AuthService {
     final user = _supabase.auth.currentUser;
     if (user == null) return Stream.value(0);
 
-    // Escuta em tempo real apenas mensagens para mim
     return _supabase
         .from('chat_messages')
         .stream(primaryKey: ['id'])
@@ -659,15 +679,13 @@ class AuthService {
       final user = _supabase.auth.currentUser;
       if (user == null) return [];
 
-      // Verifica se realmente é nutricionista
       final isNutri = await isNutritionist();
       if (!isNutri) return [];
 
-      // Busca apenas os pacientes vinculados a este nutricionista
       final response = await _supabase
           .from('patient_profiles')
           .select()
-          .eq('nutritionist_id', user.id) // <--- A MÁGICA ACONTECE AQUI
+          .eq('nutritionist_id', user.id)
           .order('name', ascending: true);
 
       return response;
